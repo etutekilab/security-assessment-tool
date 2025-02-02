@@ -22,7 +22,8 @@ jobs:
           echo "window.env = {" > env.js
           echo "  OPENAI_API_KEY: '${{ secrets.OPENAI_API_KEY }}'," >> env.js
           echo "  SUPABASE_URL: '${{ secrets.SUPABASE_URL }}'," >> env.js
-          echo "  SUPABASE_ANON_KEY: '${{ secrets.SUPABASE_ANON_KEY }}'" >> env.js
+          echo "  SUPABASE_ANON_KEY: '${{ secrets.SUPABASE_ANON_KEY }}'," >> env.js
+          echo "  ENVIRONMENT: 'production'" >> env.js
           echo "};" >> env.js
 
       - name: Deploy to GitHub Pages

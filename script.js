@@ -1041,6 +1041,12 @@ async function submitAssessment() {
     submitButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Submitting...';
     
     try {
+        console.log('Starting submission...');
+        
+        // Initialize Supabase client
+        const supabase = createClient(window.env.SUPABASE_URL, window.env.SUPABASE_ANON_KEY);
+        console.log('Supabase client initialized');
+
         const leadData = JSON.parse(localStorage.getItem('assessmentLeadData'));
         const assessmentData = {
             lead_info: leadData,
@@ -1048,8 +1054,14 @@ async function submitAssessment() {
             submitted_at: new Date().toISOString()
         };
         
+        // Log the data being collected
+        console.log('Lead data:', leadData);
+        
         // Collect responses and evidence
-        for (const questionEl of document.querySelectorAll('.question')) {
+        const questions = document.querySelectorAll('.question');
+        console.log(`Processing ${questions.length} questions...`);
+
+        for (const questionEl of questions) {
             const questionId = questionEl.dataset.questionId;
             const answer = questionEl.querySelector('.option-btn.selected')?.textContent;
             const notes = questionEl.querySelector('textarea').value;
@@ -1057,16 +1069,26 @@ async function submitAssessment() {
             // Handle evidence uploads
             const evidenceUrls = [];
             const evidenceItems = questionEl.querySelectorAll('.evidence-item img');
+            console.log(`Processing ${evidenceItems.length} evidence items for question ${questionId}`);
+
             for (const img of evidenceItems) {
-                const file = await fetch(img.src).then(r => r.blob());
-                const filename = `${leadData.companyName}/${questionId}/${Date.now()}.png`;
-                
-                const { data, error } = await supabase.storage
-                    .from(SUPABASE_CONFIG.bucket)
-                    .upload(filename, file);
-                
-                if (!error) {
+                try {
+                    const file = await fetch(img.src).then(r => r.blob());
+                    const filename = `${leadData.companyName}/${questionId}/${Date.now()}.png`;
+                    
+                    const { data, error } = await supabase.storage
+                        .from('assessment-evidence')
+                        .upload(filename, file);
+                    
+                    if (error) {
+                        console.error('Evidence upload error:', error);
+                        throw error;
+                    }
+                    
                     evidenceUrls.push(data.path);
+                    console.log('Evidence uploaded:', data.path);
+                } catch (uploadError) {
+                    console.error('Error uploading evidence:', uploadError);
                 }
             }
             
@@ -1078,18 +1100,46 @@ async function submitAssessment() {
             });
         }
         
-        // Save to Supabase database
-        const { error } = await supabase
-            .from('assessments')
-            .insert(assessmentData);
-            
-        if (error) throw error;
+        console.log('Saving assessment data:', assessmentData);
         
+        // Save to Supabase database
+        const { data, error } = await supabase
+            .from('assessments')
+            .insert(assessmentData)
+            .select();
+            
+        if (error) {
+            console.error('Database error:', error);
+            throw error;
+        }
+
+        console.log('Assessment saved successfully:', data);
         showSubmissionSuccess();
     } catch (error) {
-        console.error('Error submitting assessment:', error);
+        console.error('Submission error:', error);
+        submitButton.disabled = false;
+        submitButton.innerHTML = '<i class="fas fa-paper-plane"></i> Try Again';
         showSubmissionError();
     }
+}
+
+function showSubmissionError() {
+    const modal = document.createElement('div');
+    modal.className = 'modal';
+    
+    modal.innerHTML = `
+        <div class="modal-content error">
+            <h3><i class="fas fa-exclamation-circle"></i> Submission Failed</h3>
+            <p>There was an error submitting your assessment. Please try again or contact support if the problem persists.</p>
+            <div class="modal-actions">
+                <button class="btn primary" onclick="this.closest('.modal').remove()">
+                    OK
+                </button>
+            </div>
+        </div>
+    `;
+    
+    document.body.appendChild(modal);
 }
 
 function showSubmissionSuccess() {
