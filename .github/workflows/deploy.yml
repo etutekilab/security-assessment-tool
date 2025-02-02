@@ -17,71 +17,57 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v3
 
-      - name: Debug Secrets Presence
+      - name: Validate Secrets
         run: |
-          echo "Checking secrets presence..."
-          echo "SUPABASE_URL exists: ${{ secrets.SUPABASE_URL != '' }}"
-          echo "SUPABASE_ANON_KEY exists: ${{ secrets.SUPABASE_ANON_KEY != '' }}"
-          echo "OPENAI_API_KEY exists: ${{ secrets.OPENAI_API_KEY != '' }}"
-
-      - name: Create and verify env file
-        run: |
-          # Create env.js
-          echo "Creating env.js..."
-          echo "window.env = {" > env.js
-          echo "  OPENAI_API_KEY: '${{ secrets.OPENAI_API_KEY }}'," >> env.js
-          echo "  SUPABASE_URL: '${{ secrets.SUPABASE_URL }}'," >> env.js
-          echo "  SUPABASE_ANON_KEY: '${{ secrets.SUPABASE_ANON_KEY }}'," >> env.js
-          echo "  ENVIRONMENT: 'production'" >> env.js
-          echo "};" >> env.js
-
-          # Verify file exists and has content
-          echo "Verifying env.js..."
-          if [ ! -f env.js ]; then
-            echo "env.js not created!"
+          # Check if secrets exist
+          if [ -z "${{ secrets.SUPABASE_URL }}" ]; then
+            echo "Error: SUPABASE_URL is not set"
+            exit 1
+          fi
+          if [ -z "${{ secrets.SUPABASE_ANON_KEY }}" ]; then
+            echo "Error: SUPABASE_ANON_KEY is not set"
+            exit 1
+          fi
+          if [ -z "${{ secrets.OPENAI_API_KEY }}" ]; then
+            echo "Error: OPENAI_API_KEY is not set"
             exit 1
           fi
 
-          # Check file size
-          FILESIZE=$(wc -c < env.js)
-          echo "env.js size: $FILESIZE bytes"
-          if [ $FILESIZE -eq 0 ]; then
-            echo "Error: env.js is empty!"
-            exit 1
-          fi
-
-          # Verify structure (sanitized)
-          echo "env.js structure:"
-          cat env.js | sed 's/: ".*"/: "[REDACTED]"/'
-
-      - name: Debug env.js content
-        run: |
-          echo "Checking env.js content (sanitized)..."
-          echo "SUPABASE_URL length: ${#SUPABASE_URL}"
-          echo "SUPABASE_ANON_KEY length: ${#SUPABASE_ANON_KEY}"
-          echo "OPENAI_API_KEY length: ${#OPENAI_API_KEY}"
-          cat env.js | sed 's/\(.*key.*\): .*/\1: [REDACTED]/'
-        env:
-          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-
-      - name: Verify Secrets
-        run: |
-          echo "Checking secrets format..."
+          # Validate formats
           if [[ ! "${{ secrets.SUPABASE_URL }}" =~ ^https:// ]]; then
-            echo "Error: SUPABASE_URL should start with https://"
+            echo "Error: SUPABASE_URL must start with https://"
             exit 1
           fi
           if [[ ! "${{ secrets.SUPABASE_ANON_KEY }}" =~ ^eyJ ]]; then
-            echo "Error: SUPABASE_ANON_KEY has incorrect format"
+            echo "Error: SUPABASE_ANON_KEY must start with eyJ"
             exit 1
           fi
           if [[ ! "${{ secrets.OPENAI_API_KEY }}" =~ ^sk- ]]; then
-            echo "Error: OPENAI_API_KEY has incorrect format"
+            echo "Error: OPENAI_API_KEY must start with sk-"
             exit 1
           fi
-          echo "All secrets have correct format"
+
+          echo "✓ All secrets validated successfully"
+
+      - name: Create env.js
+        run: |
+          cat > env.js << EOF
+          window.env = {
+            OPENAI_API_KEY: '${{ secrets.OPENAI_API_KEY }}',
+            SUPABASE_URL: '${{ secrets.SUPABASE_URL }}',
+            SUPABASE_ANON_KEY: '${{ secrets.SUPABASE_ANON_KEY }}',
+            ENVIRONMENT: 'production'
+          };
+          EOF
+
+          # Verify file
+          if [ ! -f env.js ] || [ ! -s env.js ]; then
+            echo "Error: env.js not created or empty"
+            exit 1
+          fi
+
+          echo "✓ env.js created successfully"
+          echo "File size: $(wc -c < env.js) bytes"
 
       - name: Deploy to GitHub Pages
         uses: peaceiris/actions-gh-pages@v3
