@@ -1291,36 +1291,57 @@ function createLeadForm() {
     return leadSection;
 }
 
-// Add this function to test the connection
-async function testSupabaseSetup() {
+// Comprehensive connection test function
+async function testConnections() {
+    console.log('🔄 Testing API connections...');
+    
     try {
+        // Test env variables
+        console.log('Environment variables:', {
+            hasSupabaseUrl: !!window.env?.SUPABASE_URL,
+            hasSupabaseKey: !!window.env?.SUPABASE_ANON_KEY,
+            supabaseUrlFormat: window.env?.SUPABASE_URL?.startsWith('https://'),
+            supabaseKeyFormat: window.env?.SUPABASE_ANON_KEY?.startsWith('eyJ')
+        });
+
+        if (!window.env?.SUPABASE_URL || !window.env?.SUPABASE_ANON_KEY) {
+            throw new Error('Missing Supabase configuration');
+        }
+
+        // Initialize Supabase
+        const supabase = createClient(window.env.SUPABASE_URL, window.env.SUPABASE_ANON_KEY);
+        console.log('Supabase client initialized');
+
         // Test database connection
-        const { data: dbTest, error: dbError } = await supabase
+        const { data, error } = await supabase
             .from('assessments')
-            .select('count(*)');
-        
-        if (dbError) throw new Error('Database connection failed: ' + dbError.message);
+            .select('count(*)')
+            .limit(1);
+
+        if (error) {
+            console.error('Supabase Error Details:', {
+                code: error.code,
+                message: error.message,
+                details: error.details
+            });
+            throw error;
+        }
+
         console.log('✅ Database connection successful');
-
-        // Test storage bucket
-        const { data: storageTest, error: storageError } = await supabase
-            .storage
-            .getBucket('assessment-evidence');
-            
-        if (storageError) throw new Error('Storage bucket not found: ' + storageError.message);
-        console.log('✅ Storage bucket verified');
-
         return true;
     } catch (error) {
-        console.error('❌ Supabase setup error:', error);
+        console.error('❌ Connection Error:', {
+            message: error.message,
+            stack: error.stack
+        });
         return false;
     }
 }
 
 // Call this when page loads
 document.addEventListener('DOMContentLoaded', async () => {
-    const setupOk = await testSupabaseSetup();
-    if (!setupOk) {
-        alert('Error: Database connection failed. Please check your configuration.');
+    const connectionsOk = await testConnections();
+    if (!connectionsOk) {
+        console.error('⚠️ API connections failed. Check the console for details.');
     }
 }); 
