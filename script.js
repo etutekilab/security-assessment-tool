@@ -1041,76 +1041,61 @@ async function submitAssessment() {
     submitButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Submitting...';
     
     try {
-        console.log('Starting submission...');
-        
+        if (!window.env?.SUPABASE_URL || !window.env?.SUPABASE_ANON_KEY) {
+            throw new Error('Supabase configuration missing');
+        }
+
         // Initialize Supabase client
         const supabase = createClient(window.env.SUPABASE_URL, window.env.SUPABASE_ANON_KEY);
-        console.log('Supabase client initialized');
-
+        
+        // Get lead data
         const leadData = JSON.parse(localStorage.getItem('assessmentLeadData'));
+        if (!leadData) {
+            throw new Error('Lead data not found');
+        }
+
+        // Prepare assessment data
         const assessmentData = {
             lead_info: leadData,
             responses: [],
             submitted_at: new Date().toISOString()
         };
-        
-        // Log the data being collected
-        console.log('Lead data:', leadData);
-        
-        // Collect responses and evidence
-        const questions = document.querySelectorAll('.question');
-        console.log(`Processing ${questions.length} questions...`);
 
+        // Collect responses
+        const questions = document.querySelectorAll('.question');
         for (const questionEl of questions) {
             const questionId = questionEl.dataset.questionId;
-            const answer = questionEl.querySelector('.option-btn.selected')?.textContent;
-            const notes = questionEl.querySelector('textarea').value;
-            
-            // Handle evidence uploads
-            const evidenceUrls = [];
-            const evidenceItems = questionEl.querySelectorAll('.evidence-item img');
-            console.log(`Processing ${evidenceItems.length} evidence items for question ${questionId}`);
+            const selectedBtn = questionEl.querySelector('.option-btn.selected');
+            if (!selectedBtn) continue; // Skip if no answer selected
 
-            for (const img of evidenceItems) {
-                try {
-                    const file = await fetch(img.src).then(r => r.blob());
-                    const filename = `${leadData.companyName}/${questionId}/${Date.now()}.png`;
-                    
-                    const { data, error } = await supabase.storage
-                        .from('assessment-evidence')
-                        .upload(filename, file);
-                    
-                    if (error) {
-                        console.error('Evidence upload error:', error);
-                        throw error;
-                    }
-                    
-                    evidenceUrls.push(data.path);
-                    console.log('Evidence uploaded:', data.path);
-                } catch (uploadError) {
-                    console.error('Error uploading evidence:', uploadError);
-                }
-            }
-            
+            const answer = selectedBtn.textContent;
+            const notes = questionEl.querySelector('textarea')?.value || '';
+
             assessmentData.responses.push({
                 question_id: questionId,
                 answer,
                 notes,
-                evidence_urls: evidenceUrls
+                evidence_urls: [] // We'll handle evidence separately
             });
         }
-        
-        console.log('Saving assessment data:', assessmentData);
-        
-        // Save to Supabase database
+
+        // Validate responses
+        if (assessmentData.responses.length === 0) {
+            throw new Error('No responses collected');
+        }
+
+        console.log('Submitting assessment data:', assessmentData);
+
+        // Save to Supabase
         const { data, error } = await supabase
             .from('assessments')
             .insert(assessmentData)
-            .select();
-            
+            .select()
+            .single();
+
         if (error) {
-            console.error('Database error:', error);
-            throw error;
+            console.error('Supabase error:', error);
+            throw new Error(error.message);
         }
 
         console.log('Assessment saved successfully:', data);
@@ -1119,7 +1104,23 @@ async function submitAssessment() {
         console.error('Submission error:', error);
         submitButton.disabled = false;
         submitButton.innerHTML = '<i class="fas fa-paper-plane"></i> Try Again';
-        showSubmissionError();
+        
+        // Show more specific error message
+        const modal = document.createElement('div');
+        modal.className = 'modal';
+        modal.innerHTML = `
+            <div class="modal-content error">
+                <h3><i class="fas fa-exclamation-circle"></i> Submission Failed</h3>
+                <p>Error: ${error.message}</p>
+                <p>Please try again or contact support if the problem persists.</p>
+                <div class="modal-actions">
+                    <button class="btn primary" onclick="this.closest('.modal').remove()">
+                        OK
+                    </button>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(modal);
     }
 }
 
@@ -1346,12 +1347,12 @@ async function testConnections() {
     console.log('🔄 Testing API connections...');
     
     try {
-        // Test env variables
-        console.log('Environment variables:', {
-            hasSupabaseUrl: !!window.env?.SUPABASE_URL,
-            hasSupabaseKey: !!window.env?.SUPABASE_ANON_KEY,
-            supabaseUrlFormat: window.env?.SUPABASE_URL?.startsWith('https://'),
-            supabaseKeyFormat: window.env?.SUPABASE_ANON_KEY?.startsWith('eyJ')
+        // Debug environment variables
+        console.log('Environment Check:', {
+            envExists: !!window.env,
+            supabaseUrl: window.env?.SUPABASE_URL?.substring(0, 10) + '...',
+            supabaseKeyLength: window.env?.SUPABASE_ANON_KEY?.length,
+            openAiKeyLength: window.env?.OPENAI_API_KEY?.length
         });
 
         if (!window.env?.SUPABASE_URL || !window.env?.SUPABASE_ANON_KEY) {
@@ -1377,10 +1378,11 @@ async function testConnections() {
             throw error;
         }
 
-        console.log('✅ Database connection successful');
+        console.log('✅ Database connection successful, count:', data);
         return true;
     } catch (error) {
         console.error('❌ Connection Error:', {
+            name: error.name,
             message: error.message,
             stack: error.stack
         });
@@ -1393,5 +1395,34 @@ document.addEventListener('DOMContentLoaded', async () => {
     const connectionsOk = await testConnections();
     if (!connectionsOk) {
         console.error('⚠️ API connections failed. Check the console for details.');
+    }
+});
+
+// Add this function to test Supabase connection
+async function testSupabaseConnection() {
+    try {
+        const supabase = createClient(window.env.SUPABASE_URL, window.env.SUPABASE_ANON_KEY);
+        
+        // Test simple query
+        const { data, error } = await supabase
+            .from('assessments')
+            .select('id')
+            .limit(1);
+            
+        if (error) throw error;
+        
+        console.log('Supabase connection test successful');
+        return true;
+    } catch (error) {
+        console.error('Supabase connection test failed:', error);
+        return false;
+    }
+}
+
+// Call this on page load
+document.addEventListener('DOMContentLoaded', async () => {
+    const isConnected = await testSupabaseConnection();
+    if (!isConnected) {
+        console.error('Failed to connect to Supabase');
     }
 }); 
