@@ -19,6 +19,12 @@ jobs:
 
       - name: Validate Secrets
         run: |
+          # Debug secret presence (safely)
+          echo "Checking SUPABASE_URL..."
+          echo "Has value: ${{ secrets.SUPABASE_URL != '' }}"
+          echo "Length: ${#SUPABASE_URL}"
+          echo "First 8 chars: ${SUPABASE_URL:0:8}"
+          
           # Check if secrets exist
           if [ -z "${{ secrets.SUPABASE_URL }}" ]; then
             echo "Error: SUPABASE_URL is not set"
@@ -48,6 +54,8 @@ jobs:
           fi
 
           echo "✓ All secrets validated successfully"
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
 
       - name: Create env.js
         run: |
