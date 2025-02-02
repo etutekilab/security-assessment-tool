@@ -774,66 +774,33 @@ function initializeTheme() {
 }
 
 // Update the initialization code
-document.addEventListener('DOMContentLoaded', () => {
-    const container = document.querySelector('.container');
-    
-    // Add lead collection form
-    container.appendChild(createLeadForm());
-    
-    const form = document.getElementById('assessment-form');
-    
-    // Add theme switcher
-    document.body.appendChild(createThemeSwitcher());
-    initializeTheme();
-    
-    // Add progress bar
-    form.appendChild(createProgressBar());
-    
-    // Add sections
-    assessmentData.sections.forEach(section => {
-        totalQuestions += section.questions.length;
-        form.appendChild(createSection(section));
-    });
-    
-    // Add navigation buttons
-    form.appendChild(createNavigationButtons());
-    
-    // Add search function
-    form.appendChild(addSearchFunction());
-    
-    // Add quick evidence buttons
-    form.appendChild(addQuickEvidenceButtons());
-    
-    // Add quick navigation
-    form.appendChild(createQuickNav());
-    
-    // Add submit section at the end
-    form.appendChild(createSubmitSection());
-    
-    // Show first page
-    showPage(0);
-    updateProgress(0);
-
-    // Initialize Supabase client
-    const supabase = createClient(SUPABASE_CONFIG.url, SUPABASE_CONFIG.anonKey);
-
-    // Add this after initializing Supabase client
-    async function testSupabaseConnection() {
-        try {
-            const { data, error } = await supabase
-                .from('assessments')
-                .select('count(*)')
-                .single();
-                
-            if (error) throw error;
-            console.log('Supabase connection successful!');
-        } catch (error) {
-            console.error('Supabase connection error:', error);
+document.addEventListener('DOMContentLoaded', async () => {
+    try {
+        // Test connections
+        const connectionsOk = await testConnections();
+        if (!connectionsOk) {
+            throw new Error('API connections failed');
         }
-    }
 
-    // Call it when the page loads
-    testSupabaseConnection();
+        // Initialize the assessment form
+        initializeAssessment();
+    } catch (error) {
+        console.error('Initialization error:', error);
+        const errorBanner = document.createElement('div');
+        errorBanner.style.cssText = `
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            background: #ff4444;
+            color: white;
+            padding: 10px;
+            text-align: center;
+            z-index: 9999;
+        `;
+        errorBanner.textContent = `⚠️ Error: ${error.message}. Please refresh the page or contact support.`;
+        document.body.appendChild(errorBanner);
+    }
 });
 
 // Add system theme change listener
@@ -1041,8 +1008,14 @@ async function submitAssessment() {
     submitButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Submitting...';
     
     try {
+        // Verify environment variables
         if (!window.env?.SUPABASE_URL || !window.env?.SUPABASE_ANON_KEY) {
-            throw new Error('Supabase configuration missing');
+            console.error('Environment Check:', {
+                hasUrl: !!window.env?.SUPABASE_URL,
+                hasKey: !!window.env?.SUPABASE_ANON_KEY,
+                env: window.env
+            });
+            throw new Error('Supabase configuration missing. Please check your setup.');
         }
 
         // Initialize Supabase client
@@ -1051,7 +1024,7 @@ async function submitAssessment() {
         // Get lead data
         const leadData = JSON.parse(localStorage.getItem('assessmentLeadData'));
         if (!leadData) {
-            throw new Error('Lead data not found');
+            throw new Error('Lead information not found');
         }
 
         // Prepare assessment data
@@ -1066,25 +1039,18 @@ async function submitAssessment() {
         for (const questionEl of questions) {
             const questionId = questionEl.dataset.questionId;
             const selectedBtn = questionEl.querySelector('.option-btn.selected');
-            if (!selectedBtn) continue; // Skip if no answer selected
-
-            const answer = selectedBtn.textContent;
             const notes = questionEl.querySelector('textarea')?.value || '';
-
-            assessmentData.responses.push({
-                question_id: questionId,
-                answer,
-                notes,
-                evidence_urls: [] // We'll handle evidence separately
-            });
+            
+            if (selectedBtn) {
+                assessmentData.responses.push({
+                    question_id: questionId,
+                    answer: selectedBtn.textContent,
+                    notes: notes
+                });
+            }
         }
 
-        // Validate responses
-        if (assessmentData.responses.length === 0) {
-            throw new Error('No responses collected');
-        }
-
-        console.log('Submitting assessment data:', assessmentData);
+        console.log('Submitting assessment:', assessmentData);
 
         // Save to Supabase
         const { data, error } = await supabase
@@ -1094,44 +1060,29 @@ async function submitAssessment() {
             .single();
 
         if (error) {
-            console.error('Supabase error:', error);
+            console.error('Supabase Error:', error);
             throw new Error(error.message);
         }
 
-        console.log('Assessment saved successfully:', data);
+        console.log('Assessment saved:', data);
         showSubmissionSuccess();
     } catch (error) {
         console.error('Submission error:', error);
         submitButton.disabled = false;
         submitButton.innerHTML = '<i class="fas fa-paper-plane"></i> Try Again';
         
-        // Show more specific error message
-        const modal = document.createElement('div');
-        modal.className = 'modal';
-        modal.innerHTML = `
-            <div class="modal-content error">
-                <h3><i class="fas fa-exclamation-circle"></i> Submission Failed</h3>
-                <p>Error: ${error.message}</p>
-                <p>Please try again or contact support if the problem persists.</p>
-                <div class="modal-actions">
-                    <button class="btn primary" onclick="this.closest('.modal').remove()">
-                        OK
-                    </button>
-                </div>
-            </div>
-        `;
-        document.body.appendChild(modal);
+        showSubmissionError(error.message);
     }
 }
 
-function showSubmissionError() {
+function showSubmissionError(message) {
     const modal = document.createElement('div');
     modal.className = 'modal';
     
     modal.innerHTML = `
         <div class="modal-content error">
             <h3><i class="fas fa-exclamation-circle"></i> Submission Failed</h3>
-            <p>There was an error submitting your assessment. Please try again or contact support if the problem persists.</p>
+            <p>${message}</p>
             <div class="modal-actions">
                 <button class="btn primary" onclick="this.closest('.modal').remove()">
                     OK
@@ -1165,55 +1116,42 @@ function showSubmissionSuccess() {
     document.body.appendChild(modal);
 }
 
-// Add this new function to get AI-suggested notes
+// Update the getAINotes function
 async function getAINotes(question, selectedAnswer) {
     try {
-        const response = await fetch(`${OPENAI_CONFIG.baseURL}/chat/completions`, {
+        if (!window.env?.OPENAI_API_KEY) {
+            throw new Error('OpenAI configuration missing');
+        }
+
+        const response = await fetch('https://api.openai.com/v1/chat/completions', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'Authorization': `Bearer ${OPENAI_CONFIG.apiKey}`
+                'Authorization': `Bearer ${window.env.OPENAI_API_KEY}`
             },
             body: JSON.stringify({
-                model: OPENAI_CONFIG.model,
+                model: 'gpt-4-0125-preview',
                 messages: [{
                     role: "system",
-                    content: `You are writing brief notes for a cybersecurity assessment.
-                    Format your response in 3-4 bullet points maximum.
-                    Each bullet should be one line only.
-                    Focus only on:
-                    • Current implementation status
-                    • Key evidence available
-                    • Major gaps (if any)
-                    
-                    Keep it extremely concise and factual.
-                    Don't use technical jargon.`
+                    content: `You are writing brief notes for a cybersecurity assessment.`
                 }, {
                     role: "user",
-                    content: `For the question: "${question}"
-                    Answer selected: "${selectedAnswer}"
-                    
-                    Write 3-4 short bullet points explaining:
-                    • What's currently in place
-                    • What evidence exists
-                    • What needs attention (if applicable)
-                    
-                    Keep each bullet to one line only.`
+                    content: `Question: "${question}"\nAnswer: "${selectedAnswer}"`
                 }],
-                max_tokens: 150,
-                temperature: 0.7
+                max_tokens: 150
             })
         });
-        
+
         if (!response.ok) {
-            throw new Error(`API request failed: ${response.status}`);
+            const error = await response.json();
+            throw new Error(error.error?.message || 'OpenAI request failed');
         }
-        
+
         const data = await response.json();
         return data.choices[0].message.content;
     } catch (error) {
-        console.error('Error getting AI notes:', error);
-        return '• Unable to generate notes. Please write your notes manually.';
+        console.error('AI Notes Error:', error);
+        return '• Unable to generate notes. Please try again or write manually.';
     }
 }
 
@@ -1342,46 +1280,81 @@ function createLeadForm() {
     return leadSection;
 }
 
-// Comprehensive connection test function
+// Comprehensive API connection test
 async function testConnections() {
-    console.log('🔄 Testing API connections...');
+    console.log('🔄 Starting API connection tests...');
     
     try {
-        // Debug environment variables
-        console.log('Environment Check:', {
+        // 1. Check environment variables
+        console.log('1. Checking environment variables...');
+        const envCheck = {
             envExists: !!window.env,
-            supabaseUrl: window.env?.SUPABASE_URL?.substring(0, 10) + '...',
-            supabaseKeyLength: window.env?.SUPABASE_ANON_KEY?.length,
-            openAiKeyLength: window.env?.OPENAI_API_KEY?.length
-        });
+            hasSupabaseUrl: !!window.env?.SUPABASE_URL,
+            hasSupabaseKey: !!window.env?.SUPABASE_ANON_KEY,
+            hasOpenAIKey: !!window.env?.OPENAI_API_KEY,
+            supabaseUrlFormat: window.env?.SUPABASE_URL?.startsWith('https://'),
+            supabaseKeyFormat: window.env?.SUPABASE_ANON_KEY?.startsWith('eyJ'),
+            openAIKeyFormat: window.env?.OPENAI_API_KEY?.startsWith('sk-')
+        };
+        console.log('Environment check:', envCheck);
 
-        if (!window.env?.SUPABASE_URL || !window.env?.SUPABASE_ANON_KEY) {
-            throw new Error('Missing Supabase configuration');
-        }
+        if (!envCheck.envExists) throw new Error('Environment not loaded');
+        if (!envCheck.hasSupabaseUrl || !envCheck.hasSupabaseKey) throw new Error('Missing Supabase credentials');
+        if (!envCheck.hasOpenAIKey) throw new Error('Missing OpenAI credentials');
 
-        // Initialize Supabase
+        // 2. Test Supabase Connection
+        console.log('2. Testing Supabase connection...');
         const supabase = createClient(window.env.SUPABASE_URL, window.env.SUPABASE_ANON_KEY);
-        console.log('Supabase client initialized');
-
-        // Test database connection
-        const { data, error } = await supabase
+        
+        // Test database query
+        const { data: dbData, error: dbError } = await supabase
             .from('assessments')
             .select('count(*)')
             .limit(1);
-
-        if (error) {
-            console.error('Supabase Error Details:', {
-                code: error.code,
-                message: error.message,
-                details: error.details
-            });
-            throw error;
+            
+        if (dbError) {
+            console.error('Supabase Error:', dbError);
+            throw new Error(`Supabase database error: ${dbError.message}`);
         }
+        console.log('✅ Supabase database connected');
 
-        console.log('✅ Database connection successful, count:', data);
+        // Test storage bucket
+        const { data: bucketData, error: bucketError } = await supabase
+            .storage
+            .getBucket('assessment-evidence');
+            
+        if (bucketError) {
+            console.error('Storage Error:', bucketError);
+            throw new Error(`Storage bucket error: ${bucketError.message}`);
+        }
+        console.log('✅ Supabase storage bucket verified');
+
+        // 3. Test OpenAI Connection
+        console.log('3. Testing OpenAI connection...');
+        const openAIResponse = await fetch('https://api.openai.com/v1/chat/completions', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${window.env.OPENAI_API_KEY}`
+            },
+            body: JSON.stringify({
+                model: 'gpt-4-0125-preview',
+                messages: [{ role: 'user', content: 'Test connection' }],
+                max_tokens: 5
+            })
+        });
+
+        if (!openAIResponse.ok) {
+            const error = await openAIResponse.json();
+            console.error('OpenAI Error:', error);
+            throw new Error(`OpenAI error: ${error.error?.message || openAIResponse.statusText}`);
+        }
+        console.log('✅ OpenAI API connected');
+
+        console.log('✅ All connection tests passed!');
         return true;
     } catch (error) {
-        console.error('❌ Connection Error:', {
+        console.error('❌ Connection test failed:', {
             name: error.name,
             message: error.message,
             stack: error.stack
@@ -1390,39 +1363,23 @@ async function testConnections() {
     }
 }
 
-// Call this when page loads
+// Call test on page load
 document.addEventListener('DOMContentLoaded', async () => {
     const connectionsOk = await testConnections();
     if (!connectionsOk) {
-        console.error('⚠️ API connections failed. Check the console for details.');
-    }
-});
-
-// Add this function to test Supabase connection
-async function testSupabaseConnection() {
-    try {
-        const supabase = createClient(window.env.SUPABASE_URL, window.env.SUPABASE_ANON_KEY);
-        
-        // Test simple query
-        const { data, error } = await supabase
-            .from('assessments')
-            .select('id')
-            .limit(1);
-            
-        if (error) throw error;
-        
-        console.log('Supabase connection test successful');
-        return true;
-    } catch (error) {
-        console.error('Supabase connection test failed:', error);
-        return false;
-    }
-}
-
-// Call this on page load
-document.addEventListener('DOMContentLoaded', async () => {
-    const isConnected = await testSupabaseConnection();
-    if (!isConnected) {
-        console.error('Failed to connect to Supabase');
+        const errorBanner = document.createElement('div');
+        errorBanner.style.cssText = `
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            background: #ff4444;
+            color: white;
+            padding: 10px;
+            text-align: center;
+            z-index: 9999;
+        `;
+        errorBanner.textContent = '⚠️ API Connection Error. Check console for details.';
+        document.body.appendChild(errorBanner);
     }
 }); 

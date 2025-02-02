@@ -24,8 +24,9 @@ jobs:
           echo "SUPABASE_ANON_KEY exists: ${{ secrets.SUPABASE_ANON_KEY != '' }}"
           echo "OPENAI_API_KEY exists: ${{ secrets.OPENAI_API_KEY != '' }}"
 
-      - name: Create env file
+      - name: Create and verify env file
         run: |
+          # Create env.js
           echo "Creating env.js..."
           echo "window.env = {" > env.js
           echo "  OPENAI_API_KEY: '${{ secrets.OPENAI_API_KEY }}'," >> env.js
@@ -33,7 +34,32 @@ jobs:
           echo "  SUPABASE_ANON_KEY: '${{ secrets.SUPABASE_ANON_KEY }}'," >> env.js
           echo "  ENVIRONMENT: 'production'" >> env.js
           echo "};" >> env.js
-          echo "env.js created successfully"
+
+          # Verify file exists and has content
+          echo "Verifying env.js..."
+          if [ ! -f env.js ]; then
+            echo "env.js not created!"
+            exit 1
+          fi
+          
+          # Check file size
+          echo "env.js size: $(wc -c < env.js) bytes"
+          
+          # Verify structure (sanitized)
+          echo "env.js structure:"
+          cat env.js | sed 's/: ".*"/: "[REDACTED]"/'
+
+      - name: Debug env.js content
+        run: |
+          echo "Checking env.js content (sanitized)..."
+          echo "SUPABASE_URL length: ${#SUPABASE_URL}"
+          echo "SUPABASE_ANON_KEY length: ${#SUPABASE_ANON_KEY}"
+          echo "OPENAI_API_KEY length: ${#OPENAI_API_KEY}"
+          cat env.js | sed 's/\(.*key.*\): .*/\1: [REDACTED]/'
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
 
       - name: Deploy to GitHub Pages
         uses: peaceiris/actions-gh-pages@v3
