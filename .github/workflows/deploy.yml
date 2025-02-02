@@ -41,10 +41,15 @@ jobs:
             echo "env.js not created!"
             exit 1
           fi
-          
+
           # Check file size
-          echo "env.js size: $(wc -c < env.js) bytes"
-          
+          FILESIZE=$(wc -c < env.js)
+          echo "env.js size: $FILESIZE bytes"
+          if [ $FILESIZE -eq 0 ]; then
+            echo "Error: env.js is empty!"
+            exit 1
+          fi
+
           # Verify structure (sanitized)
           echo "env.js structure:"
           cat env.js | sed 's/: ".*"/: "[REDACTED]"/'
