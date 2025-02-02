@@ -773,16 +773,58 @@ function initializeTheme() {
     }
 }
 
-// Update the initialization code
+// Add this function to initialize the assessment form
+function initializeAssessment() {
+    const container = document.querySelector('.container');
+    
+    // Add lead collection form
+    container.appendChild(createLeadForm());
+    
+    const form = document.getElementById('assessment-form');
+    
+    // Add theme switcher
+    document.body.appendChild(createThemeSwitcher());
+    initializeTheme();
+    
+    // Add progress bar
+    form.appendChild(createProgressBar());
+    
+    // Add sections
+    assessmentData.sections.forEach(section => {
+        totalQuestions += section.questions.length;
+        form.appendChild(createSection(section));
+    });
+    
+    // Add navigation buttons
+    form.appendChild(createNavigationButtons());
+    
+    // Add search function
+    form.appendChild(addSearchFunction());
+    
+    // Add quick evidence buttons
+    form.appendChild(addQuickEvidenceButtons());
+    
+    // Add quick navigation
+    form.appendChild(createQuickNav());
+    
+    // Add submit section at the end
+    form.appendChild(createSubmitSection());
+    
+    // Show first page
+    showPage(0);
+    updateProgress(0);
+}
+
+// Update the DOMContentLoaded event listener
 document.addEventListener('DOMContentLoaded', async () => {
     try {
-        // Test connections
+        // Test connections first
         const connectionsOk = await testConnections();
         if (!connectionsOk) {
             throw new Error('API connections failed');
         }
 
-        // Initialize the assessment form
+        // If connections are good, initialize the form
         initializeAssessment();
     } catch (error) {
         console.error('Initialization error:', error);
@@ -794,12 +836,37 @@ document.addEventListener('DOMContentLoaded', async () => {
             right: 0;
             background: #ff4444;
             color: white;
-            padding: 10px;
+            padding: 10px 20px;
             text-align: center;
             z-index: 9999;
+            font-size: 14px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
         `;
-        errorBanner.textContent = `⚠️ Error: ${error.message}. Please refresh the page or contact support.`;
+        errorBanner.innerHTML = `
+            <span>⚠️ ${error.message}. Check console for details.</span>
+            <button onclick="location.reload()" style="
+                background: white;
+                color: #ff4444;
+                border: none;
+                padding: 5px 10px;
+                border-radius: 4px;
+                cursor: pointer;
+            ">Retry</button>
+        `;
         document.body.appendChild(errorBanner);
+
+        // Still initialize the form but disable API-dependent features
+        initializeAssessment();
+        
+        // Disable API-dependent buttons
+        document.querySelectorAll('.ai-notes-btn').forEach(btn => {
+            btn.disabled = true;
+            btn.title = 'API connection required';
+        });
+        
+        document.querySelector('.submit-btn')?.setAttribute('disabled', 'true');
     }
 });
 

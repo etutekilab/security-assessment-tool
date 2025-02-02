@@ -61,6 +61,23 @@ jobs:
           SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
 
+      - name: Verify Secrets
+        run: |
+          echo "Checking secrets format..."
+          if [[ ! "${{ secrets.SUPABASE_URL }}" =~ ^https:// ]]; then
+            echo "Error: SUPABASE_URL should start with https://"
+            exit 1
+          fi
+          if [[ ! "${{ secrets.SUPABASE_ANON_KEY }}" =~ ^eyJ ]]; then
+            echo "Error: SUPABASE_ANON_KEY has incorrect format"
+            exit 1
+          fi
+          if [[ ! "${{ secrets.OPENAI_API_KEY }}" =~ ^sk- ]]; then
+            echo "Error: OPENAI_API_KEY has incorrect format"
+            exit 1
+          fi
+          echo "All secrets have correct format"
+
       - name: Deploy to GitHub Pages
         uses: peaceiris/actions-gh-pages@v3
         with:
