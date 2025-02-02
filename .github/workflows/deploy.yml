@@ -17,14 +17,19 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v3
 
+      - name: Debug Secrets Presence
+        run: |
+          echo "Checking secrets presence..."
+          echo "SUPABASE_URL exists: ${{ secrets.SUPABASE_URL != '' }}"
+          echo "SUPABASE_ANON_KEY exists: ${{ secrets.SUPABASE_ANON_KEY != '' }}"
+          echo "OPENAI_API_KEY exists: ${{ secrets.OPENAI_API_KEY != '' }}"
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+
       - name: Validate Secrets
         run: |
-          # Debug secret presence (safely)
-          echo "Checking SUPABASE_URL..."
-          echo "Has value: ${{ secrets.SUPABASE_URL != '' }}"
-          echo "Length: ${#SUPABASE_URL}"
-          echo "First 8 chars: ${SUPABASE_URL:0:8}"
-          
           # Check if secrets exist
           if [ -z "${{ secrets.SUPABASE_URL }}" ]; then
             echo "Error: SUPABASE_URL is not set"
@@ -54,8 +59,6 @@ jobs:
           fi
 
           echo "✓ All secrets validated successfully"
-        env:
-          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
 
       - name: Create env.js
         run: |
