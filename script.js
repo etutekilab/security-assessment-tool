@@ -1225,7 +1225,7 @@ async function getAINotes(question, selectedAnswer) {
                 'Authorization': `Bearer ${window.env.OPENAI_API_KEY}`
             },
             body: JSON.stringify({
-                model: 'gpt-4-0125-preview',
+                model: 'gpt-4o-2024-08-06',
                 messages: [{
                     role: "system",
                     content: `You are writing brief notes for a cybersecurity assessment.`
