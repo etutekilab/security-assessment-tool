@@ -559,9 +559,9 @@ function selectOption(selectedButton, optionsContainer) {
     updateProgress(getAnsweredQuestionsCount());
 }
 
-function showNotification(message) {
+function showNotification(message, type = 'info') {
     const notification = document.createElement('div');
-    notification.className = 'notification';
+    notification.className = `notification ${type}`;
     notification.textContent = message;
     document.body.appendChild(notification);
     
@@ -842,77 +842,27 @@ async function testConnections() {
     console.log('🔄 Starting API connection tests...');
     
     try {
-        // Wait for environment
-        const env = await waitForEnvironment();
-        if (!env) {
-            throw new Error('Environment failed to load');
-        }
+        // Initialize the form first
+        initializeAssessment();
 
-        // Log environment status (safely)
-        console.log('Environment Check:', {
-            hasSupabaseUrl: !!env.SUPABASE_URL,
-            hasSupabaseKey: !!env.SUPABASE_ANON_KEY,
-            hasOpenAIKey: !!env.OPENAI_API_KEY,
-            supabaseUrlStart: env.SUPABASE_URL?.substring(0, 8),
-            supabaseKeyStart: env.SUPABASE_ANON_KEY?.substring(0, 3),
-            openAIKeyStart: env.OPENAI_API_KEY?.substring(0, 3)
-        });
-
-        // Initialize Supabase
-        const supabase = createClient(env.SUPABASE_URL, env.SUPABASE_ANON_KEY);
-        
-        // Test Supabase connection
-        const { data, error } = await supabase
-            .from('assessments')
-            .select('count(*)')
-            .limit(1);
-            
-        if (error) throw error;
-        console.log('✅ Supabase connected');
-
-        // Test OpenAI connection
-        const openAIResponse = await fetch('https://api.openai.com/v1/chat/completions', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${env.OPENAI_API_KEY}`
-            },
-            body: JSON.stringify({
-                model: 'gpt-4-0125-preview',
-                messages: [{ role: 'user', content: 'Test' }],
-                max_tokens: 5
-            })
-        });
-
-        if (!openAIResponse.ok) {
-            const error = await openAIResponse.json();
-            throw new Error(`OpenAI error: ${error.error?.message}`);
-        }
-        console.log('✅ OpenAI connected');
-
-        return true;
-    } catch (error) {
-        console.error('❌ Connection test failed:', error);
-        return false;
-    }
-}
-
-// Initialize the application
-document.addEventListener('DOMContentLoaded', async () => {
-    try {
-        // Test connections first
+        // Test connections
         const connectionsOk = await testConnections();
         if (!connectionsOk) {
             throw new Error('API connections failed');
         }
 
-        // Initialize the assessment form
-        initializeAssessment();
+        // If connections are good, enable API features
+        document.querySelectorAll('.ai-notes-btn').forEach(btn => {
+            btn.disabled = false;
+            btn.title = 'Get AI suggestions';
+        });
+        
+        document.querySelector('.submit-btn')?.removeAttribute('disabled');
         
         // Hide any existing error banners
         document.querySelectorAll('.error-banner').forEach(banner => banner.remove());
     } catch (error) {
-        console.error('Initialization error:', error);
+        console.error('API Initialization error:', error);
         
         // Show error banner if not already shown
         if (!document.querySelector('.error-banner')) {
@@ -934,7 +884,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 align-items: center;
             `;
             errorBanner.innerHTML = `
-                <span>⚠️ ${error.message}. Check console for details.</span>
+                <span>⚠️ Some features may be limited. API connection failed.</span>
                 <button onclick="location.reload()" style="
                     background: white;
                     color: #ff4444;
@@ -947,18 +897,23 @@ document.addEventListener('DOMContentLoaded', async () => {
             document.body.appendChild(errorBanner);
         }
 
-        // Still initialize the form but disable API features
-        initializeAssessment();
-        
-        // Disable API-dependent buttons
+        // Keep buttons enabled but show warning on click
         document.querySelectorAll('.ai-notes-btn').forEach(btn => {
-            btn.disabled = true;
-            btn.title = 'API connection required';
+            btn.onclick = (e) => {
+                e.preventDefault();
+                showNotification('API connection required. Please refresh and try again.', 'error');
+            };
         });
         
-        document.querySelector('.submit-btn')?.setAttribute('disabled', 'true');
+        const submitBtn = document.querySelector('.submit-btn');
+        if (submitBtn) {
+            submitBtn.onclick = (e) => {
+                e.preventDefault();
+                showNotification('API connection required. Please refresh and try again.', 'error');
+            };
+        }
     }
-});
+}
 
 // Add system theme change listener
 window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', e => {
@@ -1076,6 +1031,7 @@ function createSubmitSection() {
     const submitButton = document.createElement('button');
     submitButton.className = 'btn submit-btn';
     submitButton.innerHTML = '<i class="fas fa-paper-plane"></i> Submit Assessment';
+    submitButton.type = 'button'; // Explicitly set type to prevent form submission
     
     submitButton.addEventListener('click', () => {
         const validation = validateAssessment();
@@ -1462,106 +1418,25 @@ function createLeadForm() {
     return leadSection;
 }
 
-// Comprehensive API connection test
-async function testConnections() {
-    console.log('🔄 Starting API connection tests...');
+function validateAssessment() {
+    const unansweredQuestions = [];
+    let isValid = true;
     
-    try {
-        // 1. Check environment variables
-        console.log('1. Checking environment variables...');
-        const envCheck = {
-            envExists: !!window.env,
-            hasSupabaseUrl: !!window.env?.SUPABASE_URL,
-            hasSupabaseKey: !!window.env?.SUPABASE_ANON_KEY,
-            hasOpenAIKey: !!window.env?.OPENAI_API_KEY,
-            supabaseUrlFormat: window.env?.SUPABASE_URL?.startsWith('https://'),
-            supabaseKeyFormat: window.env?.SUPABASE_ANON_KEY?.startsWith('eyJ'),
-            openAIKeyFormat: window.env?.OPENAI_API_KEY?.startsWith('sk-')
-        };
-        console.log('Environment check:', envCheck);
-
-        if (!envCheck.envExists) throw new Error('Environment not loaded');
-        if (!envCheck.hasSupabaseUrl || !envCheck.hasSupabaseKey) throw new Error('Missing Supabase credentials');
-        if (!envCheck.hasOpenAIKey) throw new Error('Missing OpenAI credentials');
-
-        // 2. Test Supabase Connection
-        console.log('2. Testing Supabase connection...');
-        const supabase = createClient(window.env.SUPABASE_URL, window.env.SUPABASE_ANON_KEY);
-        
-        // Test database query
-        const { data: dbData, error: dbError } = await supabase
-            .from('assessments')
-            .select('count(*)')
-            .limit(1);
+    assessmentData.sections.forEach(section => {
+        section.questions.forEach(question => {
+            const questionEl = document.querySelector(`[data-question-id="${question.id}"]`);
+            if (!questionEl) return; // Skip if element not found
             
-        if (dbError) {
-            console.error('Supabase Error:', dbError);
-            throw new Error(`Supabase database error: ${dbError.message}`);
-        }
-        console.log('✅ Supabase database connected');
-
-        // Test storage bucket
-        const { data: bucketData, error: bucketError } = await supabase
-            .storage
-            .getBucket('assessment-evidence');
-            
-        if (bucketError) {
-            console.error('Storage Error:', bucketError);
-            throw new Error(`Storage bucket error: ${bucketError.message}`);
-        }
-        console.log('✅ Supabase storage bucket verified');
-
-        // 3. Test OpenAI Connection
-        console.log('3. Testing OpenAI connection...');
-        const openAIResponse = await fetch('https://api.openai.com/v1/chat/completions', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${window.env.OPENAI_API_KEY}`
-            },
-            body: JSON.stringify({
-                model: 'gpt-4-0125-preview',
-                messages: [{ role: 'user', content: 'Test connection' }],
-                max_tokens: 5
-            })
+            const hasAnswer = questionEl.querySelector('.option-btn.selected');
+            if (!hasAnswer) {
+                isValid = false;
+                unansweredQuestions.push({
+                    section: section.title,
+                    text: question.text
+                });
+            }
         });
-
-        if (!openAIResponse.ok) {
-            const error = await openAIResponse.json();
-            console.error('OpenAI Error:', error);
-            throw new Error(`OpenAI error: ${error.error?.message || openAIResponse.statusText}`);
-        }
-        console.log('✅ OpenAI API connected');
-
-        console.log('✅ All connection tests passed!');
-        return true;
-    } catch (error) {
-        console.error('❌ Connection test failed:', {
-            name: error.name,
-            message: error.message,
-            stack: error.stack
-        });
-        return false;
-    }
-}
-
-// Call test on page load
-document.addEventListener('DOMContentLoaded', async () => {
-    const connectionsOk = await testConnections();
-    if (!connectionsOk) {
-        const errorBanner = document.createElement('div');
-        errorBanner.style.cssText = `
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            background: #ff4444;
-            color: white;
-            padding: 10px;
-            text-align: center;
-            z-index: 9999;
-        `;
-        errorBanner.textContent = '⚠️ API Connection Error. Check console for details.';
-        document.body.appendChild(errorBanner);
-    }
-}); 
+    });
+    
+    return { isValid, unansweredQuestions };
+} 
