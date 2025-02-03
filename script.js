@@ -1439,4 +1439,21 @@ function validateAssessment() {
     });
     
     return { isValid, unansweredQuestions };
-} 
+}
+
+// Add this at the beginning of script.js
+document.addEventListener('DOMContentLoaded', () => {
+    // Initialize assessment form
+    const assessmentForm = document.getElementById('assessment-form');
+    if (assessmentForm) {
+        // Create and append lead form
+        const leadForm = createLeadForm();
+        assessmentForm.appendChild(leadForm);
+        
+        // Initialize total questions count
+        totalQuestions = assessmentData.sections.reduce((total, section) => 
+            total + section.questions.length, 0);
+            
+        console.log('Assessment form initialized with', totalQuestions, 'questions');
+    }
+}); 

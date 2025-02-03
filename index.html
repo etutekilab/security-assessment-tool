@@ -10,36 +10,54 @@
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     
     <!-- Load environment and config -->
-    <script>
-        // Wait for env.js to load
-        function waitForEnv() {
-            return new Promise((resolve) => {
-                if (window.env) {
-                    resolve();
-                    return;
-                }
-                const checkEnv = setInterval(() => {
-                    if (window.env) {
-                        clearInterval(checkEnv);
-                        resolve();
-                    }
-                }, 100);
-            });
-        }
-
-        // Initialize app after env loads
-        async function initApp() {
-            await waitForEnv();
-            console.log('Environment loaded:', {
-                hasSupabase: !!window.env?.SUPABASE_URL,
-                hasOpenAI: !!window.env?.OPENAI_API_KEY
-            });
-        }
-
-        document.addEventListener('DOMContentLoaded', initApp);
-    </script>
     <script src="env.js"></script>
     <script src="config.js"></script>
+    
+    <!-- Initialize app -->
+    <script>
+        document.addEventListener('DOMContentLoaded', async () => {
+            try {
+                // Initialize config
+                await initializeConfig();
+                
+                // Initialize assessment form
+                const assessmentForm = document.getElementById('assessment-form');
+                if (assessmentForm) {
+                    // Create and append lead form
+                    const leadForm = createLeadForm();
+                    assessmentForm.appendChild(leadForm);
+                    
+                    // Hide assessment sections initially
+                    assessmentForm.style.display = 'none';
+                }
+                
+                console.log('App initialized successfully');
+            } catch (error) {
+                console.error('Initialization error:', error);
+                showErrorBanner(error.message);
+            }
+        });
+
+        function showErrorBanner(message) {
+            const banner = document.createElement('div');
+            banner.className = 'error-banner';
+            banner.style.cssText = `
+                position: fixed;
+                top: 0;
+                left: 0;
+                right: 0;
+                background: #ff4444;
+                color: white;
+                padding: 10px;
+                text-align: center;
+                z-index: 9999;
+            `;
+            banner.textContent = `⚠️ ${message}`;
+            document.body.appendChild(banner);
+        }
+    </script>
+    
+    <!-- Load main application script -->
     <script src="script.js"></script>
     
     <title>Cybersecurity Assessment</title>
