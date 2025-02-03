@@ -17,19 +17,27 @@
     <script>
         document.addEventListener('DOMContentLoaded', async () => {
             try {
-                // Initialize config
+                // Initialize config first
                 await initializeConfig();
+                console.log('Config initialized');
                 
-                // Initialize assessment form
-                const assessmentForm = document.getElementById('assessment-form');
-                if (assessmentForm) {
-                    // Create and append lead form
-                    const leadForm = createLeadForm();
-                    assessmentForm.appendChild(leadForm);
-                    
-                    // Hide assessment sections initially
-                    assessmentForm.style.display = 'none';
+                // Initialize the form
+                initializeAssessment();
+                console.log('Assessment form initialized');
+                
+                // Test API connections
+                const connectionsOk = await testAPIConnections();
+                if (!connectionsOk) {
+                    throw new Error('API connections failed');
                 }
+                
+                // Enable API features if connections are good
+                document.querySelectorAll('.ai-notes-btn').forEach(btn => {
+                    btn.disabled = false;
+                    btn.title = 'Get AI suggestions';
+                });
+                
+                document.querySelector('.submit-btn')?.removeAttribute('disabled');
                 
                 console.log('App initialized successfully');
             } catch (error) {

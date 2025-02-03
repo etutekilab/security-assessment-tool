@@ -838,80 +838,37 @@ async function waitForEnvironment() {
 }
 
 // Test API connections
-async function testConnections() {
+async function testAPIConnections() {
     console.log('🔄 Starting API connection tests...');
     
     try {
-        // Initialize the form first
-        initializeAssessment();
-
-        // Test connections
-        const connectionsOk = await testConnections();
-        if (!connectionsOk) {
-            throw new Error('API connections failed');
-        }
-
-        // If connections are good, enable API features
-        document.querySelectorAll('.ai-notes-btn').forEach(btn => {
-            btn.disabled = false;
-            btn.title = 'Get AI suggestions';
+        // Test Supabase connection
+        const supabase = createClient(window.env.SUPABASE_URL, window.env.SUPABASE_ANON_KEY);
+        const { data, error } = await supabase.from('assessments').select('count(*)').limit(1);
+        if (error) throw error;
+        console.log('✅ Supabase connected');
+        
+        // Test OpenAI connection
+        const openAIResponse = await fetch('https://api.openai.com/v1/chat/completions', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${window.env.OPENAI_API_KEY}`
+            },
+            body: JSON.stringify({
+                model: 'gpt-4-0125-preview',
+                messages: [{ role: 'user', content: 'Test' }],
+                max_tokens: 5
+            })
         });
         
-        document.querySelector('.submit-btn')?.removeAttribute('disabled');
+        if (!openAIResponse.ok) throw new Error('OpenAI connection failed');
+        console.log('✅ OpenAI connected');
         
-        // Hide any existing error banners
-        document.querySelectorAll('.error-banner').forEach(banner => banner.remove());
+        return true;
     } catch (error) {
-        console.error('API Initialization error:', error);
-        
-        // Show error banner if not already shown
-        if (!document.querySelector('.error-banner')) {
-            const errorBanner = document.createElement('div');
-            errorBanner.className = 'error-banner';
-            errorBanner.style.cssText = `
-                position: fixed;
-                top: 0;
-                left: 0;
-                right: 0;
-                background: #ff4444;
-                color: white;
-                padding: 10px 20px;
-                text-align: center;
-                z-index: 9999;
-                font-size: 14px;
-                display: flex;
-                justify-content: space-between;
-                align-items: center;
-            `;
-            errorBanner.innerHTML = `
-                <span>⚠️ Some features may be limited. API connection failed.</span>
-                <button onclick="location.reload()" style="
-                    background: white;
-                    color: #ff4444;
-                    border: none;
-                    padding: 5px 10px;
-                    border-radius: 4px;
-                    cursor: pointer;
-                ">Retry</button>
-            `;
-            document.body.appendChild(errorBanner);
-        }
-
-        // Keep buttons enabled but show warning on click
-        document.querySelectorAll('.ai-notes-btn').forEach(btn => {
-            btn.onclick = (e) => {
-                e.preventDefault();
-                showNotification('API connection required. Please refresh and try again.', 'error');
-            };
-        });
-        
-        const submitBtn = document.querySelector('.submit-btn');
-        if (submitBtn) {
-            submitBtn.onclick = (e) => {
-                e.preventDefault();
-                showNotification('API connection required. Please refresh and try again.', 'error');
-            };
-        }
+        console.error('API Connection Error:', error);
+        return false;
     }
 }
 
@@ -1439,21 +1396,4 @@ function validateAssessment() {
     });
     
     return { isValid, unansweredQuestions };
-}
-
-// Add this at the beginning of script.js
-document.addEventListener('DOMContentLoaded', () => {
-    // Initialize assessment form
-    const assessmentForm = document.getElementById('assessment-form');
-    if (assessmentForm) {
-        // Create and append lead form
-        const leadForm = createLeadForm();
-        assessmentForm.appendChild(leadForm);
-        
-        // Initialize total questions count
-        totalQuestions = assessmentData.sections.reduce((total, section) => 
-            total + section.questions.length, 0);
-            
-        console.log('Assessment form initialized with', totalQuestions, 'questions');
-    }
-}); 
+} 
