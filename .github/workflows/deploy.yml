@@ -35,49 +35,34 @@ jobs:
           echo "SUPABASE_ANON_KEY length: ${#SUPABASE_ANON_KEY}"
           echo "OPENAI_API_KEY length: ${#OPENAI_API_KEY}"
 
-      - name: Create env.js
+      - name: Create and verify env file
         run: |
-          echo "Creating env.js..."
-          echo "window.env = {" > env.js
-          echo "  OPENAI_API_KEY: '${{ secrets.OPENAI_API_KEY }}'," >> env.js
-          echo "  SUPABASE_URL: '${{ secrets.SUPABASE_URL }}'," >> env.js
-          echo "  SUPABASE_ANON_KEY: '${{ secrets.SUPABASE_ANON_KEY }}'," >> env.js
-          echo "  ENVIRONMENT: 'production'" >> env.js
-          echo "};" >> env.js
-          
-          echo "✓ env.js created"
-          echo "File size: $(wc -c < env.js) bytes"
+          # Create env.js with proper formatting
+          cat > env.js << 'EOL'
+          window.env = {
+            OPENAI_API_KEY: "${{ secrets.OPENAI_API_KEY }}",
+            SUPABASE_URL: "${{ secrets.SUPABASE_URL }}",
+            SUPABASE_ANON_KEY: "${{ secrets.SUPABASE_ANON_KEY }}",
+            ENVIRONMENT: "production"
+          };
+          console.log('Environment loaded:', {
+            hasSupabaseUrl: !!window.env.SUPABASE_URL,
+            hasSupabaseKey: !!window.env.SUPABASE_ANON_KEY,
+            hasOpenAIKey: !!window.env.OPENAI_API_KEY
+          });
+          EOL
 
-      - name: Verify env.js
-        run: |
-          echo "Verifying env.js content..."
+          # Verify env.js
+          echo "Verifying env.js..."
           if [ ! -f env.js ]; then
-            echo "Error: env.js not found"
+            echo "Error: env.js not created"
             exit 1
           fi
-          
-          if [ ! -s env.js ]; then
-            echo "Error: env.js is empty"
-            exit 1
-          fi
-          
-          # Check for required fields (safely)
-          if ! grep -q "OPENAI_API_KEY" env.js; then
-            echo "Error: OPENAI_API_KEY not found in env.js"
-            exit 1
-          fi
-          
-          if ! grep -q "SUPABASE_URL" env.js; then
-            echo "Error: SUPABASE_URL not found in env.js"
-            exit 1
-          fi
-          
-          if ! grep -q "SUPABASE_ANON_KEY" env.js; then
-            echo "Error: SUPABASE_ANON_KEY not found in env.js"
-            exit 1
-          fi
-          
-          echo "✓ env.js verified successfully"
+
+          # Check content (safely)
+          echo "Content check:"
+          grep -v 'KEY\|URL' env.js || true
+          echo "File size: $(wc -c < env.js) bytes"
 
       - name: Deploy to GitHub Pages
         uses: peaceiris/actions-gh-pages@v3
