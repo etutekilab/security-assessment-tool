@@ -815,7 +815,89 @@ function initializeAssessment() {
     updateProgress(0);
 }
 
-// Update the DOMContentLoaded event listener
+// Wait for environment to load
+async function waitForEnvironment() {
+    return new Promise((resolve) => {
+        if (window.env) {
+            resolve(window.env);
+            return;
+        }
+
+        let attempts = 0;
+        const interval = setInterval(() => {
+            attempts++;
+            if (window.env) {
+                clearInterval(interval);
+                resolve(window.env);
+            } else if (attempts >= 50) { // 5 seconds timeout
+                clearInterval(interval);
+                resolve(null);
+            }
+        }, 100);
+    });
+}
+
+// Test API connections
+async function testConnections() {
+    console.log('🔄 Starting API connection tests...');
+    
+    try {
+        // Wait for environment
+        const env = await waitForEnvironment();
+        if (!env) {
+            throw new Error('Environment failed to load');
+        }
+
+        // Log environment status (safely)
+        console.log('Environment Check:', {
+            hasSupabaseUrl: !!env.SUPABASE_URL,
+            hasSupabaseKey: !!env.SUPABASE_ANON_KEY,
+            hasOpenAIKey: !!env.OPENAI_API_KEY,
+            supabaseUrlStart: env.SUPABASE_URL?.substring(0, 8),
+            supabaseKeyStart: env.SUPABASE_ANON_KEY?.substring(0, 3),
+            openAIKeyStart: env.OPENAI_API_KEY?.substring(0, 3)
+        });
+
+        // Initialize Supabase
+        const supabase = createClient(env.SUPABASE_URL, env.SUPABASE_ANON_KEY);
+        
+        // Test Supabase connection
+        const { data, error } = await supabase
+            .from('assessments')
+            .select('count(*)')
+            .limit(1);
+            
+        if (error) throw error;
+        console.log('✅ Supabase connected');
+
+        // Test OpenAI connection
+        const openAIResponse = await fetch('https://api.openai.com/v1/chat/completions', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${env.OPENAI_API_KEY}`
+            },
+            body: JSON.stringify({
+                model: 'gpt-4-0125-preview',
+                messages: [{ role: 'user', content: 'Test' }],
+                max_tokens: 5
+            })
+        });
+
+        if (!openAIResponse.ok) {
+            const error = await openAIResponse.json();
+            throw new Error(`OpenAI error: ${error.error?.message}`);
+        }
+        console.log('✅ OpenAI connected');
+
+        return true;
+    } catch (error) {
+        console.error('❌ Connection test failed:', error);
+        return false;
+    }
+}
+
+// Initialize the application
 document.addEventListener('DOMContentLoaded', async () => {
     try {
         // Test connections first
@@ -824,40 +906,48 @@ document.addEventListener('DOMContentLoaded', async () => {
             throw new Error('API connections failed');
         }
 
-        // If connections are good, initialize the form
+        // Initialize the assessment form
         initializeAssessment();
+        
+        // Hide any existing error banners
+        document.querySelectorAll('.error-banner').forEach(banner => banner.remove());
     } catch (error) {
         console.error('Initialization error:', error);
-        const errorBanner = document.createElement('div');
-        errorBanner.style.cssText = `
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            background: #ff4444;
-            color: white;
-            padding: 10px 20px;
-            text-align: center;
-            z-index: 9999;
-            font-size: 14px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        `;
-        errorBanner.innerHTML = `
-            <span>⚠️ ${error.message}. Check console for details.</span>
-            <button onclick="location.reload()" style="
-                background: white;
-                color: #ff4444;
-                border: none;
-                padding: 5px 10px;
-                border-radius: 4px;
-                cursor: pointer;
-            ">Retry</button>
-        `;
-        document.body.appendChild(errorBanner);
+        
+        // Show error banner if not already shown
+        if (!document.querySelector('.error-banner')) {
+            const errorBanner = document.createElement('div');
+            errorBanner.className = 'error-banner';
+            errorBanner.style.cssText = `
+                position: fixed;
+                top: 0;
+                left: 0;
+                right: 0;
+                background: #ff4444;
+                color: white;
+                padding: 10px 20px;
+                text-align: center;
+                z-index: 9999;
+                font-size: 14px;
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+            `;
+            errorBanner.innerHTML = `
+                <span>⚠️ ${error.message}. Check console for details.</span>
+                <button onclick="location.reload()" style="
+                    background: white;
+                    color: #ff4444;
+                    border: none;
+                    padding: 5px 10px;
+                    border-radius: 4px;
+                    cursor: pointer;
+                ">Retry</button>
+            `;
+            document.body.appendChild(errorBanner);
+        }
 
-        // Still initialize the form but disable API-dependent features
+        // Still initialize the form but disable API features
         initializeAssessment();
         
         // Disable API-dependent buttons
