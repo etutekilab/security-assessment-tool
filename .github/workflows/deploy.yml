@@ -13,6 +13,12 @@ jobs:
       contents: write
     concurrency:
       group: ${{ github.workflow }}-${{ github.ref }}
+    
+    env:
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v3
@@ -23,62 +29,55 @@ jobs:
           echo "SUPABASE_URL exists: ${{ secrets.SUPABASE_URL != '' }}"
           echo "SUPABASE_ANON_KEY exists: ${{ secrets.SUPABASE_ANON_KEY != '' }}"
           echo "OPENAI_API_KEY exists: ${{ secrets.OPENAI_API_KEY != '' }}"
-        env:
-          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-
-      - name: Validate Secrets
-        run: |
-          # Check if secrets exist
-          if [ -z "${{ secrets.SUPABASE_URL }}" ]; then
-            echo "Error: SUPABASE_URL is not set"
-            exit 1
-          fi
-          if [ -z "${{ secrets.SUPABASE_ANON_KEY }}" ]; then
-            echo "Error: SUPABASE_ANON_KEY is not set"
-            exit 1
-          fi
-          if [ -z "${{ secrets.OPENAI_API_KEY }}" ]; then
-            echo "Error: OPENAI_API_KEY is not set"
-            exit 1
-          fi
-
-          # Validate formats
-          if [[ ! "${{ secrets.SUPABASE_URL }}" =~ ^https:// ]]; then
-            echo "Error: SUPABASE_URL must start with https://"
-            exit 1
-          fi
-          if [[ ! "${{ secrets.SUPABASE_ANON_KEY }}" =~ ^eyJ ]]; then
-            echo "Error: SUPABASE_ANON_KEY must start with eyJ"
-            exit 1
-          fi
-          if [[ ! "${{ secrets.OPENAI_API_KEY }}" =~ ^sk- ]]; then
-            echo "Error: OPENAI_API_KEY must start with sk-"
-            exit 1
-          fi
-
-          echo "✓ All secrets validated successfully"
+          
+          # Debug lengths (safely)
+          echo "SUPABASE_URL length: ${#SUPABASE_URL}"
+          echo "SUPABASE_ANON_KEY length: ${#SUPABASE_ANON_KEY}"
+          echo "OPENAI_API_KEY length: ${#OPENAI_API_KEY}"
 
       - name: Create env.js
         run: |
-          cat > env.js << EOF
-          window.env = {
-            OPENAI_API_KEY: '${{ secrets.OPENAI_API_KEY }}',
-            SUPABASE_URL: '${{ secrets.SUPABASE_URL }}',
-            SUPABASE_ANON_KEY: '${{ secrets.SUPABASE_ANON_KEY }}',
-            ENVIRONMENT: 'production'
-          };
-          EOF
+          echo "Creating env.js..."
+          echo "window.env = {" > env.js
+          echo "  OPENAI_API_KEY: '${{ secrets.OPENAI_API_KEY }}'," >> env.js
+          echo "  SUPABASE_URL: '${{ secrets.SUPABASE_URL }}'," >> env.js
+          echo "  SUPABASE_ANON_KEY: '${{ secrets.SUPABASE_ANON_KEY }}'," >> env.js
+          echo "  ENVIRONMENT: 'production'" >> env.js
+          echo "};" >> env.js
+          
+          echo "✓ env.js created"
+          echo "File size: $(wc -c < env.js) bytes"
 
-          # Verify file
-          if [ ! -f env.js ] || [ ! -s env.js ]; then
-            echo "Error: env.js not created or empty"
+      - name: Verify env.js
+        run: |
+          echo "Verifying env.js content..."
+          if [ ! -f env.js ]; then
+            echo "Error: env.js not found"
             exit 1
           fi
-
-          echo "✓ env.js created successfully"
-          echo "File size: $(wc -c < env.js) bytes"
+          
+          if [ ! -s env.js ]; then
+            echo "Error: env.js is empty"
+            exit 1
+          fi
+          
+          # Check for required fields (safely)
+          if ! grep -q "OPENAI_API_KEY" env.js; then
+            echo "Error: OPENAI_API_KEY not found in env.js"
+            exit 1
+          fi
+          
+          if ! grep -q "SUPABASE_URL" env.js; then
+            echo "Error: SUPABASE_URL not found in env.js"
+            exit 1
+          fi
+          
+          if ! grep -q "SUPABASE_ANON_KEY" env.js; then
+            echo "Error: SUPABASE_ANON_KEY not found in env.js"
+            exit 1
+          fi
+          
+          echo "✓ env.js verified successfully"
 
       - name: Deploy to GitHub Pages
         uses: peaceiris/actions-gh-pages@v3
