@@ -15,9 +15,9 @@ jobs:
       group: ${{ github.workflow }}-${{ github.ref }}
     
     env:
-      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-      SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
-      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      SUPABASE_URL: ${{ secrets.SECRET_K.SUPABASE_URL }}
+      SUPABASE_ANON_KEY: ${{ secrets.SECRET_K.SUPABASE_ANON_KEY }}
+      OPENAI_API_KEY: ${{ secrets.SECRET_K.OPENAI_API_KEY }}
 
     steps:
       - name: Checkout Repository
@@ -25,10 +25,10 @@ jobs:
 
       - name: Debug Secrets Presence
         run: |
-          echo "Checking secrets presence..."
-          echo "SUPABASE_URL exists: ${{ secrets.SUPABASE_URL != '' }}"
-          echo "SUPABASE_ANON_KEY exists: ${{ secrets.SUPABASE_ANON_KEY != '' }}"
-          echo "OPENAI_API_KEY exists: ${{ secrets.OPENAI_API_KEY != '' }}"
+          echo "Checking secrets from SECRET_K..."
+          echo "SUPABASE_URL exists: ${{ secrets.SECRET_K.SUPABASE_URL != '' }}"
+          echo "SUPABASE_ANON_KEY exists: ${{ secrets.SECRET_K.SUPABASE_ANON_KEY != '' }}"
+          echo "OPENAI_API_KEY exists: ${{ secrets.SECRET_K.OPENAI_API_KEY != '' }}"
           
           # Debug lengths (safely)
           echo "SUPABASE_URL length: ${#SUPABASE_URL}"
@@ -40,9 +40,9 @@ jobs:
           # Create env.js with proper formatting
           cat > env.js << 'EOL'
           window.env = {
-            OPENAI_API_KEY: "${{ secrets.OPENAI_API_KEY }}",
-            SUPABASE_URL: "${{ secrets.SUPABASE_URL }}",
-            SUPABASE_ANON_KEY: "${{ secrets.SUPABASE_ANON_KEY }}",
+            OPENAI_API_KEY: "${{ secrets.SECRET_K.OPENAI_API_KEY }}",
+            SUPABASE_URL: "${{ secrets.SECRET_K.SUPABASE_URL }}",
+            SUPABASE_ANON_KEY: "${{ secrets.SECRET_K.SUPABASE_ANON_KEY }}",
             ENVIRONMENT: "production"
           };
           console.log('Environment loaded:', {
