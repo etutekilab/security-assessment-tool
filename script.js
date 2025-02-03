@@ -1068,7 +1068,7 @@ function createAIAssistanceButton(question) {
     return { aiButton, aiPanel };
 }
 
-// Add submit functionality
+// Update the submit section creation
 function createSubmitSection() {
     const submitSection = document.createElement('div');
     submitSection.className = 'submit-section';
@@ -1079,10 +1079,10 @@ function createSubmitSection() {
     
     submitButton.addEventListener('click', () => {
         const validation = validateAssessment();
-        if (validation.isValid) {
-            showSubmitConfirmation();
+        if (!validation.isValid) {
+            showPartialSubmitWarning(validation.unansweredQuestions);
         } else {
-            showValidationWarning(validation.unansweredQuestions);
+            showSubmitConfirmation();
         }
     });
     
@@ -1090,38 +1090,41 @@ function createSubmitSection() {
     return submitSection;
 }
 
-function validateAssessment() {
-    const unansweredQuestions = [];
-    let isValid = true;
-    
-    assessmentData.sections.forEach(section => {
-        section.questions.forEach(question => {
-            const questionEl = document.querySelector(`[data-question-id="${question.id}"]`);
-            const hasAnswer = questionEl.querySelector('.option-btn.selected');
-            
-            if (!hasAnswer) {
-                isValid = false;
-                unansweredQuestions.push({
-                    section: section.title,
-                    questionId: question.id,
-                    text: question.text
-                });
-            }
-        });
-    });
-    
-    return { isValid, unansweredQuestions };
-}
-
-function showValidationWarning(unansweredQuestions) {
+// Add new function for partial submission warning
+function showPartialSubmitWarning(unansweredQuestions) {
     const modal = document.createElement('div');
     modal.className = 'modal';
     
     modal.innerHTML = `
         <div class="modal-content warning">
             <h3><i class="fas fa-exclamation-triangle"></i> Incomplete Assessment</h3>
-            <p>Please answer all questions before submitting. The following questions are unanswered:</p>
-            <div class="unanswered-list">
+            <p>You have ${unansweredQuestions.length} unanswered questions. Would you like to:</p>
+            <div class="modal-actions">
+                <button class="btn secondary" onclick="showUnansweredQuestions(${JSON.stringify(unansweredQuestions).replace(/"/g, '&quot;')})">
+                    Review Unanswered Questions
+                </button>
+                <button class="btn primary" onclick="showSubmitConfirmation()">
+                    Submit Anyway
+                </button>
+            </div>
+        </div>
+    `;
+    
+    document.body.appendChild(modal);
+}
+
+// Add function to show unanswered questions
+function showUnansweredQuestions(unansweredQuestions) {
+    // Remove the warning modal
+    document.querySelector('.modal').remove();
+    
+    const modal = document.createElement('div');
+    modal.className = 'modal';
+    
+    modal.innerHTML = `
+        <div class="modal-content">
+            <h3>Unanswered Questions</h3>
+            <div class="unanswered-list" style="max-height: 300px; overflow-y: auto;">
                 ${unansweredQuestions.map(q => `
                     <div class="unanswered-item">
                         <strong>${q.section}</strong>
@@ -1129,22 +1132,40 @@ function showValidationWarning(unansweredQuestions) {
                     </div>
                 `).join('')}
             </div>
-            <button class="btn primary close-modal">OK, I'll Complete Them</button>
+            <div class="modal-actions">
+                <button class="btn secondary" onclick="this.closest('.modal').remove()">
+                    Continue Editing
+                </button>
+                <button class="btn primary" onclick="showSubmitConfirmation()">
+                    Submit Anyway
+                </button>
+            </div>
         </div>
     `;
     
     document.body.appendChild(modal);
-    modal.querySelector('.close-modal').onclick = () => modal.remove();
 }
 
+// Update the submit confirmation to mention partial completion
 function showSubmitConfirmation() {
+    // Remove any existing modals
+    document.querySelectorAll('.modal').forEach(modal => modal.remove());
+    
+    const validation = validateAssessment();
+    const isComplete = validation.isValid;
+    
     const modal = document.createElement('div');
     modal.className = 'modal';
     
     modal.innerHTML = `
         <div class="modal-content">
             <h3><i class="fas fa-check-circle"></i> Submit Assessment</h3>
-            <p>Are you sure you want to submit your assessment? You won't be able to make changes after submission.</p>
+            <p>${isComplete ? 
+                'Your assessment is complete. Submit now?' : 
+                'Your assessment is partially complete. Submit anyway?'}</p>
+            ${!isComplete ? 
+                '<p class="warning-text"><small>Note: Unanswered questions will be marked as "Not Answered"</small></p>' : 
+                ''}
             <div class="modal-actions">
                 <button class="btn secondary" onclick="this.closest('.modal').remove()">
                     Review Again
@@ -1159,6 +1180,7 @@ function showSubmitConfirmation() {
     document.body.appendChild(modal);
 }
 
+// Update the submitAssessment function to handle partial submissions
 async function submitAssessment() {
     const submitButton = document.querySelector('.submit-btn');
     submitButton.disabled = true;
@@ -1188,24 +1210,27 @@ async function submitAssessment() {
         const assessmentData = {
             lead_info: leadData,
             responses: [],
-            submitted_at: new Date().toISOString()
+            submitted_at: new Date().toISOString(),
+            is_complete: false // Add completion status
         };
 
-        // Collect responses
-        const questions = document.querySelectorAll('.question');
-        for (const questionEl of questions) {
-            const questionId = questionEl.dataset.questionId;
-            const selectedBtn = questionEl.querySelector('.option-btn.selected');
-            const notes = questionEl.querySelector('textarea')?.value || '';
-            
-            if (selectedBtn) {
+        // Collect responses for all questions
+        assessmentData.sections.forEach(section => {
+            section.questions.forEach(question => {
+                const questionEl = document.querySelector(`[data-question-id="${question.id}"]`);
+                const selectedBtn = questionEl.querySelector('.option-btn.selected');
+                const notes = questionEl.querySelector('textarea')?.value || '';
+                
                 assessmentData.responses.push({
-                    question_id: questionId,
-                    answer: selectedBtn.textContent,
+                    question_id: question.id,
+                    answer: selectedBtn ? selectedBtn.textContent : 'Not Answered',
                     notes: notes
                 });
-            }
-        }
+            });
+        });
+
+        // Check if all questions are answered
+        assessmentData.is_complete = !assessmentData.responses.some(r => r.answer === 'Not Answered');
 
         console.log('Submitting assessment:', assessmentData);
 
