@@ -37,32 +37,27 @@ jobs:
 
       - name: Create and verify env file
         run: |
-          # Create env.js with proper formatting
+          # Create env.js with explicit error handling
           cat > env.js << 'EOL'
-          window.env = {
-            OPENAI_API_KEY: "${{ secrets.SECRET_K.OPENAI_API_KEY }}",
-            SUPABASE_URL: "${{ secrets.SECRET_K.SUPABASE_URL }}",
-            SUPABASE_ANON_KEY: "${{ secrets.SECRET_K.SUPABASE_ANON_KEY }}",
-            ENVIRONMENT: "production"
-          };
-          console.log('Environment loaded:', {
-            hasSupabaseUrl: !!window.env.SUPABASE_URL,
-            hasSupabaseKey: !!window.env.SUPABASE_ANON_KEY,
-            hasOpenAIKey: !!window.env.OPENAI_API_KEY
-          });
+          try {
+            window.env = {
+              OPENAI_API_KEY: "${{ secrets.SECRET_K.OPENAI_API_KEY }}",
+              SUPABASE_URL: "${{ secrets.SECRET_K.SUPABASE_URL }}",
+              SUPABASE_ANON_KEY: "${{ secrets.SECRET_K.SUPABASE_ANON_KEY }}",
+              ENVIRONMENT: "production"
+            };
+            console.log('Environment loaded successfully');
+          } catch (error) {
+            console.error('Failed to load environment:', error);
+            window.handleInitError(error);
+          }
           EOL
 
           # Verify env.js
-          echo "Verifying env.js..."
-          if [ ! -f env.js ]; then
-            echo "Error: env.js not created"
+          if [ ! -f env.js ] || [ ! -s env.js ]; then
+            echo "Error: env.js not created or empty"
             exit 1
           fi
-
-          # Check content (safely)
-          echo "Content check:"
-          grep -v 'KEY\|URL' env.js || true
-          echo "File size: $(wc -c < env.js) bytes"
 
       - name: Deploy to GitHub Pages
         uses: peaceiris/actions-gh-pages@v3

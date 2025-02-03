@@ -9,46 +9,11 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     
-    <!-- Load environment and config -->
-    <script src="env.js"></script>
-    <script src="config.js"></script>
-    
-    <!-- Initialize app -->
+    <!-- Global error handler -->
     <script>
-        document.addEventListener('DOMContentLoaded', async () => {
-            try {
-                // Initialize config first
-                await initializeConfig();
-                console.log('Config initialized');
-                
-                // Initialize the form
-                initializeAssessment();
-                console.log('Assessment form initialized');
-                
-                // Test API connections
-                const connectionsOk = await testAPIConnections();
-                if (!connectionsOk) {
-                    throw new Error('API connections failed');
-                }
-                
-                // Enable API features if connections are good
-                document.querySelectorAll('.ai-notes-btn').forEach(btn => {
-                    btn.disabled = false;
-                    btn.title = 'Get AI suggestions';
-                });
-                
-                document.querySelector('.submit-btn')?.removeAttribute('disabled');
-                
-                console.log('App initialized successfully');
-            } catch (error) {
-                console.error('Initialization error:', error);
-                showErrorBanner(error.message);
-            }
-        });
-
-        function showErrorBanner(message) {
+        window.handleInitError = function(error) {
+            console.error('Initialization error:', error);
             const banner = document.createElement('div');
-            banner.className = 'error-banner';
             banner.style.cssText = `
                 position: fixed;
                 top: 0;
@@ -60,13 +25,55 @@
                 text-align: center;
                 z-index: 9999;
             `;
-            banner.textContent = `⚠️ ${message}`;
+            banner.textContent = `⚠️ ${error.message}`;
             document.body.appendChild(banner);
-        }
+        };
+    </script>
+
+    <!-- Load environment -->
+    <script>
+        // Create global config object
+        window.APP_CONFIG = {};
+        
+        // Load environment from deployed env.js
+        const envScript = document.createElement('script');
+        envScript.src = 'env.js';
+        envScript.onerror = () => {
+            window.handleInitError(new Error('Failed to load environment configuration'));
+        };
+        document.head.appendChild(envScript);
     </script>
     
-    <!-- Load main application script -->
-    <script src="script.js"></script>
+    <!-- Initialize app after environment loads -->
+    <script>
+        envScript.onload = () => {
+            if (!window.env) {
+                window.handleInitError(new Error('Environment not properly loaded'));
+                return;
+            }
+            
+            // Initialize Supabase
+            window.APP_CONFIG.supabase = createClient(
+                window.env.SUPABASE_URL,
+                window.env.SUPABASE_ANON_KEY
+            );
+            
+            // Initialize OpenAI config
+            window.APP_CONFIG.openai = {
+                apiKey: window.env.OPENAI_API_KEY,
+                model: 'gpt-4-0125-preview',
+                baseURL: 'https://api.openai.com/v1'
+            };
+            
+            // Load main scripts
+            ['config.js', 'script.js'].forEach(src => {
+                const script = document.createElement('script');
+                script.src = src;
+                script.onerror = () => window.handleInitError(new Error(`Failed to load ${src}`));
+                document.head.appendChild(script);
+            });
+        };
+    </script>
     
     <title>Cybersecurity Assessment</title>
     <link rel="stylesheet" href="styles.css">
