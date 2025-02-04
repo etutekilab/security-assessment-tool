@@ -5,30 +5,48 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="color-scheme" content="dark light">
     
+    <!-- Load environment first -->
+    <script>
+        // Add a global error handler for script loading
+        window.handleScriptError = function(scriptSrc) {
+            console.error(`Failed to load script: ${scriptSrc}`);
+            const banner = document.createElement('div');
+            banner.style.cssText = `
+                position: fixed;
+                top: 0;
+                left: 0;
+                right: 0;
+                background: #ff4444;
+                color: white;
+                padding: 10px;
+                text-align: center;
+                z-index: 9999;
+            `;
+            banner.textContent = `⚠️ Failed to load required script: ${scriptSrc}`;
+            document.body.appendChild(banner);
+        };
+    </script>
+    
+    <script src="env.js" onerror="handleScriptError('env.js')"></script>
+    
     <!-- Load dependencies -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
-    
-    <!-- Load environment -->
-    <script src="env.js"></script>
     
     <!-- Initialize app -->
     <script>
         document.addEventListener('DOMContentLoaded', async () => {
             try {
-                // Initialize form first (this doesn't need API access)
-                initializeAssessment();
-                
                 // Debug environment loading
                 console.log('Environment check:', {
                     exists: !!window.env,
                     hasOpenAI: !!window.env?.OPENAI_API_KEY,
                     hasSupabase: !!window.env?.SUPABASE_URL && !!window.env?.SUPABASE_ANON_KEY
                 });
-                
+
                 // Validate environment configuration
                 if (!window.env) {
-                    throw new Error('Environment configuration not loaded');
+                    throw new Error('Environment configuration not loaded. Please refresh the page.');
                 }
 
                 // Validate API credentials
@@ -72,14 +90,13 @@
                     text-align: center;
                     z-index: 9999;
                 `;
-                banner.textContent = `⚠️ Some features may be limited. ${error.message}`;
+                banner.textContent = `⚠️ ${error.message}`;
                 document.body.appendChild(banner);
             }
         });
     </script>
     
     <!-- Load application scripts -->
-    <script src="config.js"></script>
     <script src="script.js"></script>
     
     <title>Cybersecurity Assessment</title>

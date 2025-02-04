@@ -25,27 +25,33 @@ jobs:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
         run: |
-          echo "window.env = {" > env.js
-          echo "  OPENAI_API_KEY: '${OPENAI_KEY}'," >> env.js
-          echo "  SUPABASE_URL: '${SUPABASE_URL}'," >> env.js
-          echo "  SUPABASE_ANON_KEY: '${SUPABASE_KEY}'," >> env.js
-          echo "  ENVIRONMENT: 'production'" >> env.js
-          echo "};" >> env.js
+          # Create a temporary directory for deployment
+          mkdir _site
+          cp -r * _site/ 2>/dev/null || :
+          
+          # Create env.js in the deployment directory
+          cat > _site/env.js << EOL
+          window.env = {
+            OPENAI_API_KEY: '${OPENAI_KEY}',
+            SUPABASE_URL: '${SUPABASE_URL}',
+            SUPABASE_ANON_KEY: '${SUPABASE_KEY}',
+            ENVIRONMENT: 'production'
+          };
+          EOL
+          
+          # Verify env.js was created
+          echo "Checking env.js..."
+          if [ -f _site/env.js ]; then
+            echo "env.js created successfully"
+            echo "File size: $(wc -c < _site/env.js) bytes"
+          else
+            echo "Error: env.js not created!"
+            exit 1
+          fi
 
       - name: Deploy to GitHub Pages
         uses: peaceiris/actions-gh-pages@v3
         with:
           github_token: ${{ secrets.TOKEN_GITHUB }}
-          publish_dir: .
+          publish_dir: ./_site
           force_orphan: true
-
-      - name: Debug env.js (safely)
-        run: |
-          echo "Checking env.js structure..."
-          if [ -f env.js ]; then
-            echo "env.js exists"
-            echo "File size: $(wc -c < env.js) bytes"
-            grep -o 'OPENAI_API_KEY\|SUPABASE_URL\|SUPABASE_ANON_KEY' env.js || true
-          else
-            echo "env.js not found!"
-          fi
