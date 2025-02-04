@@ -9,82 +9,79 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    environment: production
     permissions:
       contents: write
     concurrency:
       group: ${{ github.workflow }}-${{ github.ref }}
+    
+    env:
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
 
     steps:
-      # Checkout the repository
       - name: Checkout Repository
         uses: actions/checkout@v3
 
-      # Setup Node.js (adjust version as needed)
-      - name: Setup Node.js
-        uses: actions/setup-node@v3
-        with:
-          node-version: '16'
-
-      # Install dependencies
-      - name: Install Dependencies
-        run: npm install
-
-      # Prepare Build Directory
-      - name: Prepare Build Directory
+      - name: Debug Secrets Presence
         run: |
-          # Create build directory structure
-          mkdir -p build/config
-          mkdir -p build/assets
-
-          # Copy static files
-          cp index.html build/
-          cp styles.css build/
-          cp script.js build/
-          cp config.js build/
+          echo "Checking secrets presence..."
+          echo "SUPABASE_URL exists: ${{ secrets.SUPABASE_URL != '' }}"
+          echo "SUPABASE_ANON_KEY exists: ${{ secrets.SUPABASE_ANON_KEY != '' }}"
+          echo "OPENAI_API_KEY exists: ${{ secrets.OPENAI_API_KEY != '' }}"
           
-          # Copy assets if they exist
-          if [ -d "assets" ]; then
-            cp -r assets/* build/assets/
+          # Debug lengths (safely)
+          echo "SUPABASE_URL length: ${#SUPABASE_URL}"
+          echo "SUPABASE_ANON_KEY length: ${#SUPABASE_ANON_KEY}"
+          echo "OPENAI_API_KEY length: ${#OPENAI_API_KEY}"
+
+      - name: Create env.js
+        run: |
+          echo "Creating env.js..."
+          echo "window.env = {" > env.js
+          echo "  OPENAI_API_KEY: '${{ secrets.OPENAI_API_KEY }}'," >> env.js
+          echo "  SUPABASE_URL: '${{ secrets.SUPABASE_URL }}'," >> env.js
+          echo "  SUPABASE_ANON_KEY: '${{ secrets.SUPABASE_ANON_KEY }}'," >> env.js
+          echo "  ENVIRONMENT: 'production'" >> env.js
+          echo "};" >> env.js
+          
+          echo "✓ env.js created"
+          echo "File size: $(wc -c < env.js) bytes"
+
+      - name: Verify env.js
+        run: |
+          echo "Verifying env.js content..."
+          if [ ! -f env.js ]; then
+            echo "Error: env.js not found"
+            exit 1
           fi
           
-          echo "Build directory prepared"
-          ls -la build/
-
-      # Generate Environment Configuration
-      - name: Generate Environment Configuration
-        env:
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
-        run: |
-          # Encode secrets
-          OPENAI_ENCODED=$(echo -n "${OPENAI_API_KEY}" | base64)
-          SUPABASE_URL_ENCODED=$(echo -n "${SUPABASE_URL}" | base64)
-          SUPABASE_KEY_ENCODED=$(echo -n "${SUPABASE_ANON_KEY}" | base64)
+          if [ ! -s env.js ]; then
+            echo "Error: env.js is empty"
+            exit 1
+          fi
           
-          # Generate env.js
-          cat > build/config/env.js << EOF
-          console.log('Loading environment configuration...');
-          window.env = {
-            OPENAI_API_KEY: atob('${OPENAI_ENCODED}'),
-            SUPABASE_URL: atob('${SUPABASE_URL_ENCODED}'),
-            SUPABASE_ANON_KEY: atob('${SUPABASE_KEY_ENCODED}'),
-            ENVIRONMENT: "production"
-          };
-          console.log('Environment configuration loaded');
-          EOF
+          # Check for required fields (safely)
+          if ! grep -q "OPENAI_API_KEY" env.js; then
+            echo "Error: OPENAI_API_KEY not found in env.js"
+            exit 1
+          fi
           
-          echo "Environment configuration generated"
-          ls -la build/config/
+          if ! grep -q "SUPABASE_URL" env.js; then
+            echo "Error: SUPABASE_URL not found in env.js"
+            exit 1
+          fi
+          
+          if ! grep -q "SUPABASE_ANON_KEY" env.js; then
+            echo "Error: SUPABASE_ANON_KEY not found in env.js"
+            exit 1
+          fi
+          
+          echo "✓ env.js verified successfully"
 
-      # Deploy to GitHub Pages
       - name: Deploy to GitHub Pages
         uses: peaceiris/actions-gh-pages@v3
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./build
+          publish_dir: .
           force_orphan: true
-          user_name: 'github-actions[bot]'
-          user_email: 'github-actions[bot]@users.noreply.github.com'
-          commit_message: 'Deploy to GitHub Pages'
