@@ -33,51 +33,27 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     
+    <!-- Load configuration -->
+    <script src="config.js"></script>
+    
     <!-- Initialize app -->
     <script>
         document.addEventListener('DOMContentLoaded', async () => {
             try {
+                // Initialize configuration
+                await initializeConfig();
+                
                 // Debug environment loading
                 console.log('Environment check:', {
                     exists: !!window.env,
-                    hasOpenAI: !!window.env?.OPENAI_API_KEY,
-                    hasSupabase: !!window.env?.SUPABASE_URL && !!window.env?.SUPABASE_ANON_KEY
+                    hasOpenAI: !!window.OPENAI_CONFIG?.apiKey,
+                    hasSupabase: !!window.supabase
                 });
 
-                // Validate environment configuration
-                if (!window.env) {
-                    throw new Error('Environment configuration not loaded. Please refresh the page.');
-                }
-
-                // Validate API credentials
-                const missingCredentials = [];
-                if (!window.env.OPENAI_API_KEY) missingCredentials.push('OpenAI API Key');
-                if (!window.env.SUPABASE_URL) missingCredentials.push('Supabase URL');
-                if (!window.env.SUPABASE_ANON_KEY) missingCredentials.push('Supabase Anon Key');
-
-                if (missingCredentials.length > 0) {
-                    throw new Error(`Missing required credentials: ${missingCredentials.join(', ')}`);
-                }
-
-                // Initialize Supabase
-                window.supabase = createClient(
-                    window.env.SUPABASE_URL,
-                    window.env.SUPABASE_ANON_KEY
-                );
-
-                // Test API connections
-                const { data, error } = await window.supabase.from('assessments').select('count(*)').limit(1);
-                if (error) throw error;
-
-                // Enable API features
-                document.querySelectorAll('.ai-notes-btn').forEach(btn => {
-                    btn.disabled = false;
-                    btn.title = 'Get AI suggestions';
-                });
-                
-                document.querySelector('.submit-btn')?.removeAttribute('disabled');
+                // Initialize form
+                initializeAssessment();
             } catch (error) {
-                console.error('API Initialization error:', error);
+                console.error('Initialization error:', error);
                 const banner = document.createElement('div');
                 banner.style.cssText = `
                     position: fixed;

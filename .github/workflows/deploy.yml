@@ -57,12 +57,14 @@ jobs:
       - name: Build Application
         run: |
           # Create a build directory if it doesn't exist
-          mkdir -p build
+          mkdir -p build/config
           
           # Copy all necessary files to build directory
-          cp -r index.html styles.css script.js build/
+          cp -r index.html styles.css script.js config.js build/
           cp -r assets/* build/ 2>/dev/null || :
-          cp build/config/env.js build/
+          
+          # Move env.js to config directory
+          mv build/config/env.js build/config/
           
           echo "Build completed successfully"
         env:
