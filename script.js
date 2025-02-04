@@ -882,12 +882,15 @@ window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', e =
 // Add AI assistance functions
 async function getAIAssistance(question, context) {
     try {
+        console.log('🤖 Starting AI assistance request...');
+        
         // Check if environment is loaded
         if (!window.env?.OPENAI_API_KEY) {
+            console.error('❌ OpenAI API key missing');
             throw new Error('OpenAI API key not found. Please check configuration.');
         }
 
-        console.log('Requesting AI assistance for:', question);
+        console.log('📤 Sending request to OpenAI:', { question });
         
         const response = await fetch('https://api.openai.com/v1/chat/completions', {
             method: 'POST',
@@ -899,30 +902,10 @@ async function getAIAssistance(question, context) {
                 model: 'gpt-4o-2024-08-06',
                 messages: [{
                     role: "system",
-                    content: `You are a friendly guide helping users complete a cybersecurity assessment.
-                    Keep your responses simple, practical, and action-oriented.
-                    Structure your response in these two sections only:
-
-                    1. How to Answer:
-                    - Explain in simple terms what to check
-                    - Guide where to look in their organization
-                    - Mention who to talk to (IT team, HR, etc.)
-                    
-                    2. Evidence to Collect:
-                    - List specific documents to gather
-                    - Describe screenshots or files needed
-                    - Mention specific settings or configurations to capture
-
-                    Use bullet points and everyday language. Be very specific about what evidence to collect.`
+                    content: `You are a friendly guide helping users complete a cybersecurity assessment.`
                 }, {
                     role: "user",
-                    content: `For this question: "${question}"
-
-                    Please provide:
-                    1. Clear steps to check if they meet this requirement
-                    2. Specific evidence they should collect as proof
-
-                    Keep it practical and focused on finding real evidence.`
+                    content: `For this question: "${question}"`
                 }],
                 max_tokens: 500
             })
@@ -930,13 +913,15 @@ async function getAIAssistance(question, context) {
 
         if (!response.ok) {
             const error = await response.json();
+            console.error('❌ OpenAI API error:', error);
             throw new Error(error.error?.message || 'OpenAI request failed');
         }
 
         const data = await response.json();
+        console.log('✅ AI response received');
         return data.choices[0].message.content;
     } catch (error) {
-        console.error('AI Assistance Error:', error);
+        console.error('❌ AI Assistance Error:', error);
         return `⚠️ Sorry, couldn't get AI assistance: ${error.message}. Please try again or proceed without assistance.`;
     }
 }
@@ -1098,19 +1083,11 @@ async function submitAssessment() {
     submitButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Submitting...';
     
     try {
-        // Verify environment variables
+        // Validate Supabase configuration
         if (!window.env?.SUPABASE_URL || !window.env?.SUPABASE_ANON_KEY) {
-            console.error('Environment Check:', {
-                hasUrl: !!window.env?.SUPABASE_URL,
-                hasKey: !!window.env?.SUPABASE_ANON_KEY,
-                env: window.env
-            });
-            throw new Error('Supabase configuration missing. Please check your setup.');
+            throw new Error('Supabase configuration missing');
         }
 
-        // Initialize Supabase client
-        const supabase = createClient(window.env.SUPABASE_URL, window.env.SUPABASE_ANON_KEY);
-        
         // Get lead data
         const leadData = JSON.parse(localStorage.getItem('assessmentLeadData'));
         if (!leadData) {
@@ -1122,48 +1099,23 @@ async function submitAssessment() {
             lead_info: leadData,
             responses: [],
             submitted_at: new Date().toISOString(),
-            is_complete: false // Add completion status
+            is_complete: false
         };
 
-        // Collect responses for all questions
-        assessmentData.sections.forEach(section => {
-            section.questions.forEach(question => {
-                const questionEl = document.querySelector(`[data-question-id="${question.id}"]`);
-                const selectedBtn = questionEl.querySelector('.option-btn.selected');
-                const notes = questionEl.querySelector('textarea')?.value || '';
-                
-                assessmentData.responses.push({
-                    question_id: question.id,
-                    answer: selectedBtn ? selectedBtn.textContent : 'Not Answered',
-                    notes: notes
-                });
-            });
-        });
-
-        // Check if all questions are answered
-        assessmentData.is_complete = !assessmentData.responses.some(r => r.answer === 'Not Answered');
-
-        console.log('Submitting assessment:', assessmentData);
-
         // Save to Supabase
-        const { data, error } = await supabase
+        const { data, error } = await window.supabase
             .from('assessments')
             .insert(assessmentData)
             .select()
             .single();
 
-        if (error) {
-            console.error('Supabase Error:', error);
-            throw new Error(error.message);
-        }
+        if (error) throw error;
 
-        console.log('Assessment saved:', data);
         showSubmissionSuccess();
     } catch (error) {
         console.error('Submission error:', error);
         submitButton.disabled = false;
         submitButton.innerHTML = '<i class="fas fa-paper-plane"></i> Try Again';
-        
         showSubmissionError(error.message);
     }
 }
@@ -1212,8 +1164,9 @@ function showSubmissionSuccess() {
 // Update the getAINotes function
 async function getAINotes(question, selectedAnswer) {
     try {
+        // Validate OpenAI configuration
         if (!window.env?.OPENAI_API_KEY) {
-            throw new Error('OpenAI configuration missing');
+            throw new Error('OpenAI API key not found');
         }
 
         const response = await fetch('https://api.openai.com/v1/chat/completions', {
