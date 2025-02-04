@@ -4,47 +4,15 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="color-scheme" content="dark light">
-    
-    <!-- Load environment first -->
+    <!-- Load environment variables first -->
     <script src="env.js"></script>
-    
-    <!-- Load configuration -->
+    <!-- Then load configuration -->
     <script src="config.js"></script>
-    
-    <!-- Load dependencies -->
+    <!-- Then load other dependencies -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
-    
-    <!-- Initialize configuration before loading main script -->
-    <script>
-        document.addEventListener('DOMContentLoaded', async () => {
-            try {
-                await initializeConfig();
-                console.log('Configuration initialized successfully');
-            } catch (error) {
-                console.error('Configuration error:', error);
-                // Show error banner
-                const errorBanner = document.createElement('div');
-                errorBanner.style.cssText = `
-                    position: fixed;
-                    top: 0;
-                    left: 0;
-                    right: 0;
-                    background: #ff4444;
-                    color: white;
-                    padding: 10px;
-                    text-align: center;
-                    z-index: 9999;
-                `;
-                errorBanner.textContent = `⚠️ Configuration Error: ${error.message}`;
-                document.body.appendChild(errorBanner);
-            }
-        });
-    </script>
-    
-    <!-- Load main application script -->
+    <!-- Finally load your application code -->
     <script src="script.js"></script>
-    
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <title>Cybersecurity Assessment</title>
     <link rel="stylesheet" href="styles.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">

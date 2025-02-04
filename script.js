@@ -559,9 +559,9 @@ function selectOption(selectedButton, optionsContainer) {
     updateProgress(getAnsweredQuestionsCount());
 }
 
-function showNotification(message, type = 'info') {
+function showNotification(message) {
     const notification = document.createElement('div');
-    notification.className = `notification ${type}`;
+    notification.className = 'notification';
     notification.textContent = message;
     document.body.appendChild(notification);
     
@@ -773,8 +773,8 @@ function initializeTheme() {
     }
 }
 
-// Add this function to initialize the assessment form
-function initializeAssessment() {
+// Update the initialization code
+document.addEventListener('DOMContentLoaded', () => {
     const container = document.querySelector('.container');
     
     // Add lead collection form
@@ -813,107 +813,28 @@ function initializeAssessment() {
     // Show first page
     showPage(0);
     updateProgress(0);
-}
 
-// Wait for environment to load
-async function waitForEnvironment() {
-    return new Promise((resolve) => {
-        if (window.env) {
-            resolve(window.env);
-            return;
-        }
+    // Initialize Supabase client
+    const supabase = createClient(SUPABASE_CONFIG.url, SUPABASE_CONFIG.anonKey);
 
-        let attempts = 0;
-        const interval = setInterval(() => {
-            attempts++;
-            if (window.env) {
-                clearInterval(interval);
-                resolve(window.env);
-            } else if (attempts >= 50) { // 5 seconds timeout
-                clearInterval(interval);
-                resolve(null);
-            }
-        }, 100);
-    });
-}
-
-// Test API connections
-async function testConnections() {
-    console.log('🔄 Starting API connection tests...');
-    
-    try {
-        // Initialize the form first
-        initializeAssessment();
-
-        // Test connections
-        const connectionsOk = await testConnections();
-        if (!connectionsOk) {
-            throw new Error('API connections failed');
-        }
-
-        // If connections are good, enable API features
-        document.querySelectorAll('.ai-notes-btn').forEach(btn => {
-            btn.disabled = false;
-            btn.title = 'Get AI suggestions';
-        });
-        
-        document.querySelector('.submit-btn')?.removeAttribute('disabled');
-        
-        // Hide any existing error banners
-        document.querySelectorAll('.error-banner').forEach(banner => banner.remove());
-    } catch (error) {
-        console.error('API Initialization error:', error);
-        
-        // Show error banner if not already shown
-        if (!document.querySelector('.error-banner')) {
-            const errorBanner = document.createElement('div');
-            errorBanner.className = 'error-banner';
-            errorBanner.style.cssText = `
-                position: fixed;
-                top: 0;
-                left: 0;
-                right: 0;
-                background: #ff4444;
-                color: white;
-                padding: 10px 20px;
-                text-align: center;
-                z-index: 9999;
-                font-size: 14px;
-                display: flex;
-                justify-content: space-between;
-                align-items: center;
-            `;
-            errorBanner.innerHTML = `
-                <span>⚠️ Some features may be limited. API connection failed.</span>
-                <button onclick="location.reload()" style="
-                    background: white;
-                    color: #ff4444;
-                    border: none;
-                    padding: 5px 10px;
-                    border-radius: 4px;
-                    cursor: pointer;
-                ">Retry</button>
-            `;
-            document.body.appendChild(errorBanner);
-        }
-
-        // Keep buttons enabled but show warning on click
-        document.querySelectorAll('.ai-notes-btn').forEach(btn => {
-            btn.onclick = (e) => {
-                e.preventDefault();
-                showNotification('API connection required. Please refresh and try again.', 'error');
-            };
-        });
-        
-        const submitBtn = document.querySelector('.submit-btn');
-        if (submitBtn) {
-            submitBtn.onclick = (e) => {
-                e.preventDefault();
-                showNotification('API connection required. Please refresh and try again.', 'error');
-            };
+    // Add this after initializing Supabase client
+    async function testSupabaseConnection() {
+        try {
+            const { data, error } = await supabase
+                .from('assessments')
+                .select('count(*)')
+                .single();
+                
+            if (error) throw error;
+            console.log('Supabase connection successful!');
+        } catch (error) {
+            console.error('Supabase connection error:', error);
         }
     }
-}
+
+    // Call it when the page loads
+    testSupabaseConnection();
+});
 
 // Add system theme change listener
 window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', e => {
@@ -1023,7 +944,7 @@ function createAIAssistanceButton(question) {
     return { aiButton, aiPanel };
 }
 
-// Update the submit section creation
+// Add submit functionality
 function createSubmitSection() {
     const submitSection = document.createElement('div');
     submitSection.className = 'submit-section';
@@ -1031,14 +952,13 @@ function createSubmitSection() {
     const submitButton = document.createElement('button');
     submitButton.className = 'btn submit-btn';
     submitButton.innerHTML = '<i class="fas fa-paper-plane"></i> Submit Assessment';
-    submitButton.type = 'button'; // Explicitly set type to prevent form submission
     
     submitButton.addEventListener('click', () => {
         const validation = validateAssessment();
-        if (!validation.isValid) {
-            showPartialSubmitWarning(validation.unansweredQuestions);
-        } else {
+        if (validation.isValid) {
             showSubmitConfirmation();
+        } else {
+            showValidationWarning(validation.unansweredQuestions);
         }
     });
     
@@ -1046,41 +966,38 @@ function createSubmitSection() {
     return submitSection;
 }
 
-// Add new function for partial submission warning
-function showPartialSubmitWarning(unansweredQuestions) {
+function validateAssessment() {
+    const unansweredQuestions = [];
+    let isValid = true;
+    
+    assessmentData.sections.forEach(section => {
+        section.questions.forEach(question => {
+            const questionEl = document.querySelector(`[data-question-id="${question.id}"]`);
+            const hasAnswer = questionEl.querySelector('.option-btn.selected');
+            
+            if (!hasAnswer) {
+                isValid = false;
+                unansweredQuestions.push({
+                    section: section.title,
+                    questionId: question.id,
+                    text: question.text
+                });
+            }
+        });
+    });
+    
+    return { isValid, unansweredQuestions };
+}
+
+function showValidationWarning(unansweredQuestions) {
     const modal = document.createElement('div');
     modal.className = 'modal';
     
     modal.innerHTML = `
         <div class="modal-content warning">
             <h3><i class="fas fa-exclamation-triangle"></i> Incomplete Assessment</h3>
-            <p>You have ${unansweredQuestions.length} unanswered questions. Would you like to:</p>
-            <div class="modal-actions">
-                <button class="btn secondary" onclick="showUnansweredQuestions(${JSON.stringify(unansweredQuestions).replace(/"/g, '&quot;')})">
-                    Review Unanswered Questions
-                </button>
-                <button class="btn primary" onclick="showSubmitConfirmation()">
-                    Submit Anyway
-                </button>
-            </div>
-        </div>
-    `;
-    
-    document.body.appendChild(modal);
-}
-
-// Add function to show unanswered questions
-function showUnansweredQuestions(unansweredQuestions) {
-    // Remove the warning modal
-    document.querySelector('.modal').remove();
-    
-    const modal = document.createElement('div');
-    modal.className = 'modal';
-    
-    modal.innerHTML = `
-        <div class="modal-content">
-            <h3>Unanswered Questions</h3>
-            <div class="unanswered-list" style="max-height: 300px; overflow-y: auto;">
+            <p>Please answer all questions before submitting. The following questions are unanswered:</p>
+            <div class="unanswered-list">
                 ${unansweredQuestions.map(q => `
                     <div class="unanswered-item">
                         <strong>${q.section}</strong>
@@ -1088,40 +1005,22 @@ function showUnansweredQuestions(unansweredQuestions) {
                     </div>
                 `).join('')}
             </div>
-            <div class="modal-actions">
-                <button class="btn secondary" onclick="this.closest('.modal').remove()">
-                    Continue Editing
-                </button>
-                <button class="btn primary" onclick="showSubmitConfirmation()">
-                    Submit Anyway
-                </button>
-            </div>
+            <button class="btn primary close-modal">OK, I'll Complete Them</button>
         </div>
     `;
     
     document.body.appendChild(modal);
+    modal.querySelector('.close-modal').onclick = () => modal.remove();
 }
 
-// Update the submit confirmation to mention partial completion
 function showSubmitConfirmation() {
-    // Remove any existing modals
-    document.querySelectorAll('.modal').forEach(modal => modal.remove());
-    
-    const validation = validateAssessment();
-    const isComplete = validation.isValid;
-    
     const modal = document.createElement('div');
     modal.className = 'modal';
     
     modal.innerHTML = `
         <div class="modal-content">
             <h3><i class="fas fa-check-circle"></i> Submit Assessment</h3>
-            <p>${isComplete ? 
-                'Your assessment is complete. Submit now?' : 
-                'Your assessment is partially complete. Submit anyway?'}</p>
-            ${!isComplete ? 
-                '<p class="warning-text"><small>Note: Unanswered questions will be marked as "Not Answered"</small></p>' : 
-                ''}
+            <p>Are you sure you want to submit your assessment? You won't be able to make changes after submission.</p>
             <div class="modal-actions">
                 <button class="btn secondary" onclick="this.closest('.modal').remove()">
                     Review Again
@@ -1136,21 +1035,14 @@ function showSubmitConfirmation() {
     document.body.appendChild(modal);
 }
 
-// Update the submitAssessment function to handle partial submissions
 async function submitAssessment() {
     const submitButton = document.querySelector('.submit-btn');
     submitButton.disabled = true;
     submitButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Submitting...';
     
     try {
-        // Verify environment variables
         if (!window.env?.SUPABASE_URL || !window.env?.SUPABASE_ANON_KEY) {
-            console.error('Environment Check:', {
-                hasUrl: !!window.env?.SUPABASE_URL,
-                hasKey: !!window.env?.SUPABASE_ANON_KEY,
-                env: window.env
-            });
-            throw new Error('Supabase configuration missing. Please check your setup.');
+            throw new Error('Supabase configuration missing');
         }
 
         // Initialize Supabase client
@@ -1159,36 +1051,40 @@ async function submitAssessment() {
         // Get lead data
         const leadData = JSON.parse(localStorage.getItem('assessmentLeadData'));
         if (!leadData) {
-            throw new Error('Lead information not found');
+            throw new Error('Lead data not found');
         }
 
         // Prepare assessment data
         const assessmentData = {
             lead_info: leadData,
             responses: [],
-            submitted_at: new Date().toISOString(),
-            is_complete: false // Add completion status
+            submitted_at: new Date().toISOString()
         };
 
-        // Collect responses for all questions
-        assessmentData.sections.forEach(section => {
-            section.questions.forEach(question => {
-                const questionEl = document.querySelector(`[data-question-id="${question.id}"]`);
-                const selectedBtn = questionEl.querySelector('.option-btn.selected');
-                const notes = questionEl.querySelector('textarea')?.value || '';
-                
-                assessmentData.responses.push({
-                    question_id: question.id,
-                    answer: selectedBtn ? selectedBtn.textContent : 'Not Answered',
-                    notes: notes
-                });
+        // Collect responses
+        const questions = document.querySelectorAll('.question');
+        for (const questionEl of questions) {
+            const questionId = questionEl.dataset.questionId;
+            const selectedBtn = questionEl.querySelector('.option-btn.selected');
+            if (!selectedBtn) continue; // Skip if no answer selected
+
+            const answer = selectedBtn.textContent;
+            const notes = questionEl.querySelector('textarea')?.value || '';
+
+            assessmentData.responses.push({
+                question_id: questionId,
+                answer,
+                notes,
+                evidence_urls: [] // We'll handle evidence separately
             });
-        });
+        }
 
-        // Check if all questions are answered
-        assessmentData.is_complete = !assessmentData.responses.some(r => r.answer === 'Not Answered');
+        // Validate responses
+        if (assessmentData.responses.length === 0) {
+            throw new Error('No responses collected');
+        }
 
-        console.log('Submitting assessment:', assessmentData);
+        console.log('Submitting assessment data:', assessmentData);
 
         // Save to Supabase
         const { data, error } = await supabase
@@ -1198,29 +1094,44 @@ async function submitAssessment() {
             .single();
 
         if (error) {
-            console.error('Supabase Error:', error);
+            console.error('Supabase error:', error);
             throw new Error(error.message);
         }
 
-        console.log('Assessment saved:', data);
+        console.log('Assessment saved successfully:', data);
         showSubmissionSuccess();
     } catch (error) {
         console.error('Submission error:', error);
         submitButton.disabled = false;
         submitButton.innerHTML = '<i class="fas fa-paper-plane"></i> Try Again';
         
-        showSubmissionError(error.message);
+        // Show more specific error message
+        const modal = document.createElement('div');
+        modal.className = 'modal';
+        modal.innerHTML = `
+            <div class="modal-content error">
+                <h3><i class="fas fa-exclamation-circle"></i> Submission Failed</h3>
+                <p>Error: ${error.message}</p>
+                <p>Please try again or contact support if the problem persists.</p>
+                <div class="modal-actions">
+                    <button class="btn primary" onclick="this.closest('.modal').remove()">
+                        OK
+                    </button>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(modal);
     }
 }
 
-function showSubmissionError(message) {
+function showSubmissionError() {
     const modal = document.createElement('div');
     modal.className = 'modal';
     
     modal.innerHTML = `
         <div class="modal-content error">
             <h3><i class="fas fa-exclamation-circle"></i> Submission Failed</h3>
-            <p>${message}</p>
+            <p>There was an error submitting your assessment. Please try again or contact support if the problem persists.</p>
             <div class="modal-actions">
                 <button class="btn primary" onclick="this.closest('.modal').remove()">
                     OK
@@ -1254,42 +1165,55 @@ function showSubmissionSuccess() {
     document.body.appendChild(modal);
 }
 
-// Update the getAINotes function
+// Add this new function to get AI-suggested notes
 async function getAINotes(question, selectedAnswer) {
     try {
-        if (!window.env?.OPENAI_API_KEY) {
-            throw new Error('OpenAI configuration missing');
-        }
-
-        const response = await fetch('https://api.openai.com/v1/chat/completions', {
+        const response = await fetch(`${OPENAI_CONFIG.baseURL}/chat/completions`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'Authorization': `Bearer ${window.env.OPENAI_API_KEY}`
+                'Authorization': `Bearer ${OPENAI_CONFIG.apiKey}`
             },
             body: JSON.stringify({
-                model: 'gpt-4-0125-preview',
+                model: OPENAI_CONFIG.model,
                 messages: [{
                     role: "system",
-                    content: `You are writing brief notes for a cybersecurity assessment.`
+                    content: `You are writing brief notes for a cybersecurity assessment.
+                    Format your response in 3-4 bullet points maximum.
+                    Each bullet should be one line only.
+                    Focus only on:
+                    • Current implementation status
+                    • Key evidence available
+                    • Major gaps (if any)
+                    
+                    Keep it extremely concise and factual.
+                    Don't use technical jargon.`
                 }, {
                     role: "user",
-                    content: `Question: "${question}"\nAnswer: "${selectedAnswer}"`
+                    content: `For the question: "${question}"
+                    Answer selected: "${selectedAnswer}"
+                    
+                    Write 3-4 short bullet points explaining:
+                    • What's currently in place
+                    • What evidence exists
+                    • What needs attention (if applicable)
+                    
+                    Keep each bullet to one line only.`
                 }],
-                max_tokens: 150
+                max_tokens: 150,
+                temperature: 0.7
             })
         });
-
+        
         if (!response.ok) {
-            const error = await response.json();
-            throw new Error(error.error?.message || 'OpenAI request failed');
+            throw new Error(`API request failed: ${response.status}`);
         }
-
+        
         const data = await response.json();
         return data.choices[0].message.content;
     } catch (error) {
-        console.error('AI Notes Error:', error);
-        return '• Unable to generate notes. Please try again or write manually.';
+        console.error('Error getting AI notes:', error);
+        return '• Unable to generate notes. Please write your notes manually.';
     }
 }
 
@@ -1418,25 +1342,87 @@ function createLeadForm() {
     return leadSection;
 }
 
-function validateAssessment() {
-    const unansweredQuestions = [];
-    let isValid = true;
+// Comprehensive connection test function
+async function testConnections() {
+    console.log('🔄 Testing API connections...');
     
-    assessmentData.sections.forEach(section => {
-        section.questions.forEach(question => {
-            const questionEl = document.querySelector(`[data-question-id="${question.id}"]`);
-            if (!questionEl) return; // Skip if element not found
-            
-            const hasAnswer = questionEl.querySelector('.option-btn.selected');
-            if (!hasAnswer) {
-                isValid = false;
-                unansweredQuestions.push({
-                    section: section.title,
-                    text: question.text
-                });
-            }
+    try {
+        // Debug environment variables
+        console.log('Environment Check:', {
+            envExists: !!window.env,
+            supabaseUrl: window.env?.SUPABASE_URL?.substring(0, 10) + '...',
+            supabaseKeyLength: window.env?.SUPABASE_ANON_KEY?.length,
+            openAiKeyLength: window.env?.OPENAI_API_KEY?.length
         });
-    });
-    
-    return { isValid, unansweredQuestions };
-} 
+
+        if (!window.env?.SUPABASE_URL || !window.env?.SUPABASE_ANON_KEY) {
+            throw new Error('Missing Supabase configuration');
+        }
+
+        // Initialize Supabase
+        const supabase = createClient(window.env.SUPABASE_URL, window.env.SUPABASE_ANON_KEY);
+        console.log('Supabase client initialized');
+
+        // Test database connection
+        const { data, error } = await supabase
+            .from('assessments')
+            .select('count(*)')
+            .limit(1);
+
+        if (error) {
+            console.error('Supabase Error Details:', {
+                code: error.code,
+                message: error.message,
+                details: error.details
+            });
+            throw error;
+        }
+
+        console.log('✅ Database connection successful, count:', data);
+        return true;
+    } catch (error) {
+        console.error('❌ Connection Error:', {
+            name: error.name,
+            message: error.message,
+            stack: error.stack
+        });
+        return false;
+    }
+}
+
+// Call this when page loads
+document.addEventListener('DOMContentLoaded', async () => {
+    const connectionsOk = await testConnections();
+    if (!connectionsOk) {
+        console.error('⚠️ API connections failed. Check the console for details.');
+    }
+});
+
+// Add this function to test Supabase connection
+async function testSupabaseConnection() {
+    try {
+        const supabase = createClient(window.env.SUPABASE_URL, window.env.SUPABASE_ANON_KEY);
+        
+        // Test simple query
+        const { data, error } = await supabase
+            .from('assessments')
+            .select('id')
+            .limit(1);
+            
+        if (error) throw error;
+        
+        console.log('Supabase connection test successful');
+        return true;
+    } catch (error) {
+        console.error('Supabase connection test failed:', error);
+        return false;
+    }
+}
+
+// Call this on page load
+document.addEventListener('DOMContentLoaded', async () => {
+    const isConnected = await testSupabaseConnection();
+    if (!isConnected) {
+        console.error('Failed to connect to Supabase');
+    }
+}); 

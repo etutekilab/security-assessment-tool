@@ -13,12 +13,6 @@ jobs:
       contents: write
     concurrency:
       group: ${{ github.workflow }}-${{ github.ref }}
-    
-    env:
-      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-      SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
-      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v3
@@ -29,13 +23,8 @@ jobs:
           echo "SUPABASE_URL exists: ${{ secrets.SUPABASE_URL != '' }}"
           echo "SUPABASE_ANON_KEY exists: ${{ secrets.SUPABASE_ANON_KEY != '' }}"
           echo "OPENAI_API_KEY exists: ${{ secrets.OPENAI_API_KEY != '' }}"
-          
-          # Debug lengths (safely)
-          echo "SUPABASE_URL length: ${#SUPABASE_URL}"
-          echo "SUPABASE_ANON_KEY length: ${#SUPABASE_ANON_KEY}"
-          echo "OPENAI_API_KEY length: ${#OPENAI_API_KEY}"
 
-      - name: Create env.js
+      - name: Create env file
         run: |
           echo "Creating env.js..."
           echo "window.env = {" > env.js
@@ -44,44 +33,11 @@ jobs:
           echo "  SUPABASE_ANON_KEY: '${{ secrets.SUPABASE_ANON_KEY }}'," >> env.js
           echo "  ENVIRONMENT: 'production'" >> env.js
           echo "};" >> env.js
-          
-          echo "✓ env.js created"
-          echo "File size: $(wc -c < env.js) bytes"
-
-      - name: Verify env.js
-        run: |
-          echo "Verifying env.js content..."
-          if [ ! -f env.js ]; then
-            echo "Error: env.js not found"
-            exit 1
-          fi
-          
-          if [ ! -s env.js ]; then
-            echo "Error: env.js is empty"
-            exit 1
-          fi
-          
-          # Check for required fields (safely)
-          if ! grep -q "OPENAI_API_KEY" env.js; then
-            echo "Error: OPENAI_API_KEY not found in env.js"
-            exit 1
-          fi
-          
-          if ! grep -q "SUPABASE_URL" env.js; then
-            echo "Error: SUPABASE_URL not found in env.js"
-            exit 1
-          fi
-          
-          if ! grep -q "SUPABASE_ANON_KEY" env.js; then
-            echo "Error: SUPABASE_ANON_KEY not found in env.js"
-            exit 1
-          fi
-          
-          echo "✓ env.js verified successfully"
+          echo "env.js created successfully"
 
       - name: Deploy to GitHub Pages
         uses: peaceiris/actions-gh-pages@v3
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_dir: .
-          force_orphan: true
+          force_orphan: true 
