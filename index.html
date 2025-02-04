@@ -17,17 +17,21 @@
         document.addEventListener('DOMContentLoaded', async () => {
             try {
                 // Initialize form first (this doesn't need API access)
-                console.log('📝 Initializing assessment form...');
                 initializeAssessment();
                 
-                // Then try to connect to APIs
+                // Validate environment configuration
                 if (!window.env) {
                     throw new Error('Environment configuration not loaded');
                 }
 
-                // Validate required environment variables
-                if (!window.env.OPENAI_API_KEY || !window.env.SUPABASE_URL || !window.env.SUPABASE_ANON_KEY) {
-                    throw new Error('Missing required API credentials');
+                // Validate API credentials
+                const missingCredentials = [];
+                if (!window.env.OPENAI_API_KEY) missingCredentials.push('OpenAI API Key');
+                if (!window.env.SUPABASE_URL) missingCredentials.push('Supabase URL');
+                if (!window.env.SUPABASE_ANON_KEY) missingCredentials.push('Supabase Anon Key');
+
+                if (missingCredentials.length > 0) {
+                    throw new Error(`Missing required credentials: ${missingCredentials.join(', ')}`);
                 }
 
                 // Initialize Supabase
@@ -47,10 +51,8 @@
                 });
                 
                 document.querySelector('.submit-btn')?.removeAttribute('disabled');
-                console.log('✅ API features enabled');
             } catch (error) {
-                console.error('❌ API Initialization error:', error);
-                // Show error banner
+                console.error('API Initialization error:', error);
                 const banner = document.createElement('div');
                 banner.style.cssText = `
                     position: fixed;

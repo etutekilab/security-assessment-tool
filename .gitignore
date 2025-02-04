@@ -1,6 +1,21 @@
+# Environment files
 .env
-.env.local
 env.js
-.DS_Store
+env.local.js
+
+# IDE files
+.vscode/
+.idea/
+
+# Dependencies
 node_modules/
+
+# Build files
+dist/
+build/
+
+# Logs
+*.log
+
+.DS_Store
 config.js 

@@ -15,8 +15,8 @@ const SUPABASE_CONFIG = {
 
 // Example configuration (DO NOT put real credentials here)
 window.env = {
-    OPENAI_API_KEY: 'sk-...your-openai-key...',
-    SUPABASE_URL: 'https://your-project.supabase.co',
-    SUPABASE_ANON_KEY: 'eyJ...your-anon-key...',
-    ENVIRONMENT: 'production'
+    OPENAI_API_KEY: 'sk-...', // Your OpenAI API key
+    SUPABASE_URL: 'https://your-project.supabase.co', // Your Supabase project URL
+    SUPABASE_ANON_KEY: 'eyJ...', // Your Supabase anon key
+    ENVIRONMENT: 'development'
 }; 

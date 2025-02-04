@@ -9,7 +9,7 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    environment: production  # Specify the environment to use
+    environment: production
     permissions:
       contents: write
     concurrency:
@@ -19,21 +19,16 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v3
 
-      - name: Debug Secrets Presence
-        run: |
-          echo "Checking secrets availability..."
-          echo "SUPABASE_URL exists: ${{ secrets.SUPABASE_URL != '' }}"
-          echo "SUPABASE_ANON_KEY exists: ${{ secrets.SUPABASE_ANON_KEY != '' }}"
-          echo "OPENAI_API_KEY exists: ${{ secrets.OPENAI_API_KEY != '' }}"
-
       - name: Create env file
         run: |
-          echo "window.env = {" > env.js
-          echo "  OPENAI_API_KEY: '${{ secrets.OPENAI_API_KEY }}'," >> env.js
-          echo "  SUPABASE_URL: '${{ secrets.SUPABASE_URL }}'," >> env.js
-          echo "  SUPABASE_ANON_KEY: '${{ secrets.SUPABASE_ANON_KEY }}'," >> env.js
-          echo "  ENVIRONMENT: 'production'" >> env.js
-          echo "};" >> env.js
+          cat > env.js << 'EOL'
+          window.env = {
+            OPENAI_API_KEY: '${{ secrets.OPENAI_API_KEY }}',
+            SUPABASE_URL: '${{ secrets.SUPABASE_URL }}',
+            SUPABASE_ANON_KEY: '${{ secrets.SUPABASE_ANON_KEY }}',
+            ENVIRONMENT: 'production'
+          };
+          EOL
 
       - name: Deploy to GitHub Pages
         uses: peaceiris/actions-gh-pages@v3
