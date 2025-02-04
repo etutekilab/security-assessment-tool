@@ -20,7 +20,8 @@
                 initializeAssessment();
                 
                 // Then try to connect to APIs
-                if (window.env) {
+                if (window.env?.OPENAI_API_KEY && window.env?.SUPABASE_URL && window.env?.SUPABASE_ANON_KEY) {
+                    // Initialize Supabase
                     window.supabase = createClient(
                         window.env.SUPABASE_URL,
                         window.env.SUPABASE_ANON_KEY
@@ -29,12 +30,35 @@
                     // Enable API features
                     document.querySelectorAll('.ai-notes-btn').forEach(btn => {
                         btn.disabled = false;
+                        btn.title = 'Get AI suggestions';
                     });
                     
                     document.querySelector('.submit-btn')?.removeAttribute('disabled');
+                    console.log('API features enabled');
+                } else {
+                    console.warn('API configuration missing:', {
+                        hasOpenAI: !!window.env?.OPENAI_API_KEY,
+                        hasSupabase: !!window.env?.SUPABASE_URL
+                    });
+                    // Show warning to user
+                    const banner = document.createElement('div');
+                    banner.style.cssText = `
+                        position: fixed;
+                        top: 0;
+                        left: 0;
+                        right: 0;
+                        background: #ff9800;
+                        color: white;
+                        padding: 10px;
+                        text-align: center;
+                        z-index: 9999;
+                    `;
+                    banner.textContent = '⚠️ Some features may be limited due to missing API configuration.';
+                    document.body.appendChild(banner);
                 }
             } catch (error) {
                 console.error('Initialization error:', error);
+                // Show error banner
                 const banner = document.createElement('div');
                 banner.style.cssText = `
                     position: fixed;

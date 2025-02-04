@@ -882,6 +882,11 @@ window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', e =
 // Add AI assistance functions
 async function getAIAssistance(question, context) {
     try {
+        // Check if environment is loaded
+        if (!window.env?.OPENAI_API_KEY) {
+            throw new Error('OpenAI API key not found. Please check configuration.');
+        }
+
         console.log('Requesting AI assistance for:', question);
         
         const response = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -894,31 +899,45 @@ async function getAIAssistance(question, context) {
                 model: 'gpt-4o-2024-08-06',
                 messages: [{
                     role: "system",
-                    content: `You are a friendly guide helping users complete a cybersecurity assessment.`
+                    content: `You are a friendly guide helping users complete a cybersecurity assessment.
+                    Keep your responses simple, practical, and action-oriented.
+                    Structure your response in these two sections only:
+
+                    1. How to Answer:
+                    - Explain in simple terms what to check
+                    - Guide where to look in their organization
+                    - Mention who to talk to (IT team, HR, etc.)
+                    
+                    2. Evidence to Collect:
+                    - List specific documents to gather
+                    - Describe screenshots or files needed
+                    - Mention specific settings or configurations to capture
+
+                    Use bullet points and everyday language. Be very specific about what evidence to collect.`
                 }, {
                     role: "user",
-                    content: `For this question: "${question}"`
+                    content: `For this question: "${question}"
+
+                    Please provide:
+                    1. Clear steps to check if they meet this requirement
+                    2. Specific evidence they should collect as proof
+
+                    Keep it practical and focused on finding real evidence.`
                 }],
                 max_tokens: 500
             })
         });
-        
+
         if (!response.ok) {
-            const errorData = await response.json().catch(() => ({}));
-            console.error('API Error Response:', errorData);
-            throw new Error(`API request failed: ${response.status} ${response.statusText}`);
+            const error = await response.json();
+            throw new Error(error.error?.message || 'OpenAI request failed');
         }
-        
+
         const data = await response.json();
-        console.log('AI Response:', data);
         return data.choices[0].message.content;
     } catch (error) {
-        console.error('Detailed error:', error);
-        return `### Need Help?
-        
-Sorry, couldn't connect to the helper right now. Please try again in a moment.
-
-Error: ${error.message}`;
+        console.error('AI Assistance Error:', error);
+        return `⚠️ Sorry, couldn't get AI assistance: ${error.message}. Please try again or proceed without assistance.`;
     }
 }
 
