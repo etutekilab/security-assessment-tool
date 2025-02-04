@@ -884,43 +884,22 @@ async function getAIAssistance(question, context) {
     try {
         console.log('Requesting AI assistance for:', question);
         
-        const response = await fetch(`${OPENAI_CONFIG.baseURL}/chat/completions`, {
+        const response = await fetch('https://api.openai.com/v1/chat/completions', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'Authorization': `Bearer ${OPENAI_CONFIG.apiKey}`
+                'Authorization': `Bearer ${window.env.OPENAI_API_KEY}`
             },
             body: JSON.stringify({
-                model: OPENAI_CONFIG.model,
+                model: 'gpt-4o-2024-08-06',
                 messages: [{
                     role: "system",
-                    content: `You are a friendly guide helping users complete a cybersecurity assessment.
-                    Keep your responses simple, practical, and action-oriented.
-                    Structure your response in these two sections only:
-
-                    1. How to Answer:
-                    - Explain in simple terms what to check
-                    - Guide where to look in their organization
-                    - Mention who to talk to (IT team, HR, etc.)
-                    
-                    2. Evidence to Collect:
-                    - List specific documents to gather
-                    - Describe screenshots or files needed
-                    - Mention specific settings or configurations to capture
-
-                    Use bullet points and everyday language. Be very specific about what evidence to collect.`
+                    content: `You are a friendly guide helping users complete a cybersecurity assessment.`
                 }, {
                     role: "user",
-                    content: `For this question: "${question}"
-
-                    Please provide:
-                    1. Clear steps to check if they meet this requirement
-                    2. Specific evidence they should collect as proof
-
-                    Keep it practical and focused on finding real evidence.`
+                    content: `For this question: "${question}"`
                 }],
-                max_tokens: OPENAI_CONFIG.maxTokens,
-                temperature: 0.7
+                max_tokens: 500
             })
         });
         
