@@ -1059,7 +1059,7 @@ async function submitAssessment() {
             lead_info: leadData,
             responses: [],
             submitted_at: new Date().toISOString(),
-            status: 'partial' // Add status to indicate partial completion
+            status: 'partial'
         };
 
         // Collect all questions, including unanswered ones
@@ -1086,6 +1086,11 @@ async function submitAssessment() {
         // Calculate completion percentage
         assessmentData.completion_rate = (answeredCount / totalQuestions * 100).toFixed(1);
         
+        // Update status if all questions are answered
+        if (answeredCount === totalQuestions) {
+            assessmentData.status = 'complete';
+        }
+
         console.log('Submitting assessment data:', assessmentData);
 
         // Save to Supabase
@@ -1110,16 +1115,26 @@ async function submitAssessment() {
     }
 }
 
-// Update success modal to show completion rate
+// Update success modal to show completion rate and appropriate message
 function showSubmissionSuccess(completionRate) {
     const modal = document.createElement('div');
     modal.className = 'modal';
+    
+    const completionMessage = completionRate < 100 
+        ? `<p class="note">Note: You've completed ${completionRate}% of the assessment. You can still get valuable insights from your responses.</p>`
+        : '<p class="note">You've completed 100% of the assessment!</p>';
     
     modal.innerHTML = `
         <div class="modal-content success">
             <h3><i class="fas fa-check-circle"></i> Assessment Submitted</h3>
             <p>Your assessment has been successfully submitted.</p>
-            <p>Completion Rate: ${completionRate}%</p>
+            ${completionMessage}
+            <div class="progress-indicator">
+                <div class="progress-bar">
+                    <div class="progress-fill" style="width: ${completionRate}%"></div>
+                </div>
+                <span class="completion-rate">${completionRate}% Complete</span>
+            </div>
             <div class="modal-actions">
                 <button class="btn primary" onclick="generateReport()">
                     <i class="fas fa-file-download"></i> Download Report
@@ -1415,4 +1430,144 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (!isConnected) {
         console.error('Failed to connect to Supabase');
     }
-}); 
+});
+
+// Update the navigation buttons
+function updateNavigationButtons() {
+    const prevButton = document.querySelector('.nav-btn.prev');
+    const nextButton = document.querySelector('.nav-btn.next');
+    const submitButton = document.querySelector('.submit-btn');
+    
+    if (prevButton) prevButton.style.display = currentPage === 0 ? 'none' : 'block';
+    if (nextButton) nextButton.style.display = currentPage === Math.ceil(totalQuestions / QUESTIONS_PER_PAGE) - 1 ? 'none' : 'block';
+    if (submitButton) submitButton.style.display = currentPage === Math.ceil(totalQuestions / QUESTIONS_PER_PAGE) - 1 ? 'block' : 'none';
+    
+    // Remove the 'disabled' attribute from submit button
+    if (submitButton) {
+        submitButton.disabled = false;
+    }
+}
+
+// Update the submit button text
+function createSubmitButton() {
+    const submitButton = document.createElement('button');
+    submitButton.className = 'btn primary submit-btn';
+    submitButton.innerHTML = '<i class="fas fa-paper-plane"></i> Submit Assessment';
+    submitButton.onclick = submitAssessment;
+    return submitButton;
+}
+
+// Update the submission function
+async function submitAssessment() {
+    const submitButton = document.querySelector('.submit-btn');
+    submitButton.disabled = true;
+    submitButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Submitting...';
+    
+    try {
+        if (!window.env?.SUPABASE_URL || !window.env?.SUPABASE_ANON_KEY) {
+            throw new Error('Supabase configuration missing');
+        }
+
+        // Initialize Supabase client
+        const supabase = createClient(window.env.SUPABASE_URL, window.env.SUPABASE_ANON_KEY);
+        
+        // Get lead data
+        const leadData = JSON.parse(localStorage.getItem('assessmentLeadData'));
+        if (!leadData) {
+            throw new Error('Lead data not found');
+        }
+
+        // Prepare assessment data
+        const assessmentData = {
+            lead_info: leadData,
+            responses: [],
+            submitted_at: new Date().toISOString(),
+            status: 'partial'
+        };
+
+        // Collect all questions, including unanswered ones
+        const questions = document.querySelectorAll('.question');
+        let answeredCount = 0;
+        const totalQuestions = questions.length;
+
+        questions.forEach(questionEl => {
+            const questionId = questionEl.dataset.questionId;
+            const selectedBtn = questionEl.querySelector('.option-btn.selected');
+            const notes = questionEl.querySelector('textarea')?.value || '';
+
+            // Include both answered and unanswered questions
+            assessmentData.responses.push({
+                question_id: questionId,
+                answer: selectedBtn ? selectedBtn.textContent : 'Not Answered',
+                notes: notes,
+                status: selectedBtn ? 'completed' : 'skipped'
+            });
+
+            if (selectedBtn) answeredCount++;
+        });
+
+        // Calculate completion percentage
+        assessmentData.completion_rate = (answeredCount / totalQuestions * 100).toFixed(1);
+        
+        // Update status if all questions are answered
+        if (answeredCount === totalQuestions) {
+            assessmentData.status = 'complete';
+        }
+
+        console.log('Submitting assessment data:', assessmentData);
+
+        // Save to Supabase
+        const { data, error } = await supabase
+            .from('assessments')
+            .insert(assessmentData)
+            .select()
+            .single();
+
+        if (error) {
+            console.error('Supabase error:', error);
+            throw new Error(error.message);
+        }
+
+        // Show success message with completion rate
+        showSubmissionSuccess(assessmentData.completion_rate);
+    } catch (error) {
+        console.error('Submission error:', error);
+        submitButton.disabled = false;
+        submitButton.innerHTML = '<i class="fas fa-paper-plane"></i> Try Again';
+        showSubmissionError(error.message);
+    }
+}
+
+// Update success modal to show completion rate and appropriate message
+function showSubmissionSuccess(completionRate) {
+    const modal = document.createElement('div');
+    modal.className = 'modal';
+    
+    const completionMessage = completionRate < 100 
+        ? `<p class="note">Note: You've completed ${completionRate}% of the assessment. You can still get valuable insights from your responses.</p>`
+        : '<p class="note">You've completed 100% of the assessment!</p>';
+    
+    modal.innerHTML = `
+        <div class="modal-content success">
+            <h3><i class="fas fa-check-circle"></i> Assessment Submitted</h3>
+            <p>Your assessment has been successfully submitted.</p>
+            ${completionMessage}
+            <div class="progress-indicator">
+                <div class="progress-bar">
+                    <div class="progress-fill" style="width: ${completionRate}%"></div>
+                </div>
+                <span class="completion-rate">${completionRate}% Complete</span>
+            </div>
+            <div class="modal-actions">
+                <button class="btn primary" onclick="generateReport()">
+                    <i class="fas fa-file-download"></i> Download Report
+                </button>
+                <button class="btn secondary" onclick="window.location.reload()">
+                    Close
+                </button>
+            </div>
+        </div>
+    `;
+    
+    document.body.appendChild(modal);
+} 
