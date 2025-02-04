@@ -20,15 +20,17 @@ jobs:
         uses: actions/checkout@v3
 
       - name: Create env file
+        env:
+          OPENAI_KEY: ${{ secrets.OPENAI_API_KEY }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
         run: |
-          cat > env.js << 'EOL'
-          window.env = {
-            OPENAI_API_KEY: '${{ secrets.OPENAI_API_KEY }}',
-            SUPABASE_URL: '${{ secrets.SUPABASE_URL }}',
-            SUPABASE_ANON_KEY: '${{ secrets.SUPABASE_ANON_KEY }}',
-            ENVIRONMENT: 'production'
-          };
-          EOL
+          echo "window.env = {" > env.js
+          echo "  OPENAI_API_KEY: '${OPENAI_KEY}'," >> env.js
+          echo "  SUPABASE_URL: '${SUPABASE_URL}'," >> env.js
+          echo "  SUPABASE_ANON_KEY: '${SUPABASE_KEY}'," >> env.js
+          echo "  ENVIRONMENT: 'production'" >> env.js
+          echo "};" >> env.js
 
       - name: Deploy to GitHub Pages
         uses: peaceiris/actions-gh-pages@v3
@@ -36,3 +38,14 @@ jobs:
           github_token: ${{ secrets.TOKEN_GITHUB }}
           publish_dir: .
           force_orphan: true
+
+      - name: Debug env.js (safely)
+        run: |
+          echo "Checking env.js structure..."
+          if [ -f env.js ]; then
+            echo "env.js exists"
+            echo "File size: $(wc -c < env.js) bytes"
+            grep -o 'OPENAI_API_KEY\|SUPABASE_URL\|SUPABASE_ANON_KEY' env.js || true
+          else
+            echo "env.js not found!"
+          fi
