@@ -1058,34 +1058,32 @@ async function submitAssessment() {
         const assessmentData = {
             lead_info: leadData,
             responses: [],
-            submitted_at: new Date().toISOString(),
-            status: 'partial' // Add status to indicate partial completion
+            submitted_at: new Date().toISOString()
         };
 
-        // Collect all questions, including unanswered ones
+        // Collect responses
         const questions = document.querySelectorAll('.question');
-        let answeredCount = 0;
-        const totalQuestions = questions.length;
-
-        questions.forEach(questionEl => {
+        for (const questionEl of questions) {
             const questionId = questionEl.dataset.questionId;
             const selectedBtn = questionEl.querySelector('.option-btn.selected');
+            if (!selectedBtn) continue; // Skip if no answer selected
+
+            const answer = selectedBtn.textContent;
             const notes = questionEl.querySelector('textarea')?.value || '';
 
-            // Include both answered and unanswered questions
             assessmentData.responses.push({
                 question_id: questionId,
-                answer: selectedBtn ? selectedBtn.textContent : 'Not Answered',
-                notes: notes,
-                status: selectedBtn ? 'completed' : 'skipped'
+                answer,
+                notes,
+                evidence_urls: [] // We'll handle evidence separately
             });
+        }
 
-            if (selectedBtn) answeredCount++;
-        });
+        // Validate responses
+        if (assessmentData.responses.length === 0) {
+            throw new Error('No responses collected');
+        }
 
-        // Calculate completion percentage
-        assessmentData.completion_rate = (answeredCount / totalQuestions * 100).toFixed(1);
-        
         console.log('Submitting assessment data:', assessmentData);
 
         // Save to Supabase
@@ -1100,32 +1098,43 @@ async function submitAssessment() {
             throw new Error(error.message);
         }
 
-        // Show success message with completion rate
-        showSubmissionSuccess(assessmentData.completion_rate);
+        console.log('Assessment saved successfully:', data);
+        showSubmissionSuccess();
     } catch (error) {
         console.error('Submission error:', error);
         submitButton.disabled = false;
         submitButton.innerHTML = '<i class="fas fa-paper-plane"></i> Try Again';
-        showSubmissionError(error.message);
+        
+        // Show more specific error message
+        const modal = document.createElement('div');
+        modal.className = 'modal';
+        modal.innerHTML = `
+            <div class="modal-content error">
+                <h3><i class="fas fa-exclamation-circle"></i> Submission Failed</h3>
+                <p>Error: ${error.message}</p>
+                <p>Please try again or contact support if the problem persists.</p>
+                <div class="modal-actions">
+                    <button class="btn primary" onclick="this.closest('.modal').remove()">
+                        OK
+                    </button>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(modal);
     }
 }
 
-// Update success modal to show completion rate
-function showSubmissionSuccess(completionRate) {
+function showSubmissionError() {
     const modal = document.createElement('div');
     modal.className = 'modal';
     
     modal.innerHTML = `
-        <div class="modal-content success">
-            <h3><i class="fas fa-check-circle"></i> Assessment Submitted</h3>
-            <p>Your assessment has been successfully submitted.</p>
-            <p>Completion Rate: ${completionRate}%</p>
+        <div class="modal-content error">
+            <h3><i class="fas fa-exclamation-circle"></i> Submission Failed</h3>
+            <p>There was an error submitting your assessment. Please try again or contact support if the problem persists.</p>
             <div class="modal-actions">
-                <button class="btn primary" onclick="generateReport()">
-                    <i class="fas fa-file-download"></i> Download Report
-                </button>
-                <button class="btn secondary" onclick="window.location.reload()">
-                    Close
+                <button class="btn primary" onclick="this.closest('.modal').remove()">
+                    OK
                 </button>
             </div>
         </div>
@@ -1134,19 +1143,20 @@ function showSubmissionSuccess(completionRate) {
     document.body.appendChild(modal);
 }
 
-// Update error modal to show specific error message
-function showSubmissionError(errorMessage) {
+function showSubmissionSuccess() {
     const modal = document.createElement('div');
     modal.className = 'modal';
     
     modal.innerHTML = `
-        <div class="modal-content error">
-            <h3><i class="fas fa-exclamation-circle"></i> Submission Failed</h3>
-            <p>Error: ${errorMessage}</p>
-            <p>Please try again or contact support if the problem persists.</p>
+        <div class="modal-content success">
+            <h3><i class="fas fa-check-circle"></i> Assessment Submitted</h3>
+            <p>Your assessment has been successfully submitted. You can now download your report or close this window.</p>
             <div class="modal-actions">
-                <button class="btn primary" onclick="this.closest('.modal').remove()">
-                    OK
+                <button class="btn primary" onclick="generateReport()">
+                    <i class="fas fa-file-download"></i> Download Report
+                </button>
+                <button class="btn secondary" onclick="window.location.reload()">
+                    Close
                 </button>
             </div>
         </div>
