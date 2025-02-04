@@ -25,16 +25,19 @@
             banner.textContent = `⚠️ Failed to load required script: ${scriptSrc}. Please check console for details.`;
             document.body.appendChild(banner);
         };
+
+        // Add base path for GitHub Pages
+        window.basePath = '/security-assessment-tool';
     </script>
     
-    <script src="env.js" onerror="handleScriptError('env.js')"></script>
+    <script src="/security-assessment-tool/env.js" onerror="handleScriptError('env.js')"></script>
     
     <!-- Load dependencies -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     
     <!-- Load configuration -->
-    <script src="config.js" onerror="handleScriptError('config.js')"></script>
+    <script src="/security-assessment-tool/config.js" onerror="handleScriptError('config.js')"></script>
     
     <!-- Initialize app -->
     <script>
@@ -73,10 +76,10 @@
     </script>
     
     <!-- Load application scripts -->
-    <script src="script.js"></script>
+    <script src="/security-assessment-tool/script.js"></script>
     
     <title>Cybersecurity Assessment</title>
-    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="/security-assessment-tool/styles.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
 </head>
 <body>

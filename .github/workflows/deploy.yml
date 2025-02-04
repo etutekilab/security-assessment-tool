@@ -60,18 +60,18 @@ jobs:
       - name: Build Application
         run: |
           # Create a build directory if it doesn't exist
+          mkdir -p build
+          
+          # Copy necessary files to build directory
+          cp -r index.html styles.css script.js config.js build/
+          
+          # Create config directory and move env.js
           mkdir -p build/config
+          mv build/config/env.js build/config/
           
-          # Copy necessary files to build directory if they exist
-          cp -r index.html styles.css script.js build/
-          [ -f config.js ] && cp config.js build/
-          cp -r assets/* build/ 2>/dev/null || :
-          
-          # Ensure config directory exists and env.js is in the right place
-          mkdir -p build/config
-          [ -f build/config/env.js ] || echo "Warning: env.js not found in expected location"
-          
-          echo "Build completed successfully"
+          # Debug file structure
+          echo "Checking file structure..."
+          ls -R build/
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
