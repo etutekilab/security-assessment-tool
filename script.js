@@ -775,65 +775,62 @@ function initializeTheme() {
 
 // Update the initialization code
 document.addEventListener('DOMContentLoaded', () => {
-    const container = document.querySelector('.container');
-    
-    // Add lead collection form
-    container.appendChild(createLeadForm());
-    
-    const form = document.getElementById('assessment-form');
-    
-    // Add theme switcher
-    document.body.appendChild(createThemeSwitcher());
-    initializeTheme();
-    
-    // Add progress bar
-    form.appendChild(createProgressBar());
-    
-    // Add sections
-    assessmentData.sections.forEach(section => {
-        totalQuestions += section.questions.length;
-        form.appendChild(createSection(section));
-    });
-    
-    // Add navigation buttons
-    form.appendChild(createNavigationButtons());
-    
-    // Add search function
-    form.appendChild(addSearchFunction());
-    
-    // Add quick evidence buttons
-    form.appendChild(addQuickEvidenceButtons());
-    
-    // Add quick navigation
-    form.appendChild(createQuickNav());
-    
-    // Add submit section at the end
-    form.appendChild(createSubmitSection());
-    
-    // Show first page
-    showPage(0);
-    updateProgress(0);
-
-    // Initialize Supabase client
-    const supabase = createClient(SUPABASE_CONFIG.url, SUPABASE_CONFIG.anonKey);
-
-    // Add this after initializing Supabase client
-    async function testSupabaseConnection() {
-        try {
-            const { data, error } = await supabase
-                .from('assessments')
-                .select('count(*)')
-                .single();
-                
-            if (error) throw error;
-            console.log('Supabase connection successful!');
-        } catch (error) {
-            console.error('Supabase connection error:', error);
+    try {
+        console.log('Initializing application...');
+        const container = document.querySelector('.container');
+        if (!container) {
+            throw new Error('Container element not found');
         }
-    }
+        
+        // Add lead collection form
+        container.appendChild(createLeadForm());
+        
+        const form = document.getElementById('assessment-form');
+        if (!form) {
+            throw new Error('Assessment form element not found');
+        }
 
-    // Call it when the page loads
-    testSupabaseConnection();
+        console.log('Adding form elements...');
+        // Add theme switcher
+        document.body.appendChild(createThemeSwitcher());
+        initializeTheme();
+        
+        // Add progress bar
+        form.appendChild(createProgressBar());
+        
+        // Add sections
+        assessmentData.sections.forEach(section => {
+            totalQuestions += section.questions.length;
+            form.appendChild(createSection(section));
+        });
+        
+        // Add navigation
+        form.appendChild(createNavigationButtons());
+        
+        // Add search function
+        form.appendChild(addSearchFunction());
+        
+        // Add quick evidence buttons
+        form.appendChild(addQuickEvidenceButtons());
+        
+        // Add quick navigation
+        form.appendChild(createQuickNav());
+        
+        // Show first page
+        showPage(0);
+        updateProgress(0);
+        
+        console.log('Initialization complete');
+    } catch (error) {
+        console.error('Initialization error:', error);
+        document.body.innerHTML += `
+            <div class="error-message">
+                <h2>Initialization Error</h2>
+                <p>There was an error loading the assessment. Please refresh the page or contact support.</p>
+                <pre>${error.message}</pre>
+            </div>
+        `;
+    }
 });
 
 // Add system theme change listener
