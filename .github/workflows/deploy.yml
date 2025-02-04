@@ -30,20 +30,40 @@ jobs:
       - name: Install Dependencies
         run: npm install
 
-      # Generate client configuration (env.js)
-      - name: Generate Client Configuration
+      # Prepare Build Directory
+      - name: Prepare Build Directory
+        run: |
+          # Create build directory structure
+          mkdir -p build/config
+          mkdir -p build/assets
+
+          # Copy static files
+          cp index.html build/
+          cp styles.css build/
+          cp script.js build/
+          cp config.js build/
+          
+          # Copy assets if they exist
+          if [ -d "assets" ]; then
+            cp -r assets/* build/assets/
+          fi
+          
+          echo "Build directory prepared"
+          ls -la build/
+
+      # Generate Environment Configuration
+      - name: Generate Environment Configuration
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
         run: |
-          mkdir -p build/config
-          # Encode secrets to avoid GitHub secret scanning
+          # Encode secrets
           OPENAI_ENCODED=$(echo -n "${OPENAI_API_KEY}" | base64)
           SUPABASE_URL_ENCODED=$(echo -n "${SUPABASE_URL}" | base64)
           SUPABASE_KEY_ENCODED=$(echo -n "${SUPABASE_ANON_KEY}" | base64)
           
-          # Create env.js with proper path handling
+          # Generate env.js
           cat > build/config/env.js << EOF
           console.log('Loading environment configuration...');
           window.env = {
@@ -54,46 +74,16 @@ jobs:
           };
           console.log('Environment configuration loaded');
           EOF
-          echo "Client configuration file generated at build/config/env.js"
-
-      # Build the application
-      - name: Build Application
-        run: |
-          # Create a build directory if it doesn't exist
-          mkdir -p build
           
-          # Copy necessary files to build directory
-          cp -r index.html styles.css script.js config.js build/
-          
-          # Create config directory and move env.js
-          mkdir -p build/config
-          mv build/config/env.js build/config/
-          
-          # Debug file structure
-          echo "Checking file structure..."
-          ls -R build/
-        env:
-          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-
-      # Prepare the deployment directory
-      - name: Prepare Deployment Directory
-        run: |
-          if [ -d build ]; then
-            rm -rf _site
-            mv build _site
-          else
-            echo "Error: Build output directory not found!"
-            exit 1
-          fi
+          echo "Environment configuration generated"
+          ls -la build/config/
 
       # Deploy to GitHub Pages
       - name: Deploy to GitHub Pages
         uses: peaceiris/actions-gh-pages@v3
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./_site
+          publish_dir: ./build
           force_orphan: true
           user_name: 'github-actions[bot]'
           user_email: 'github-actions[bot]@users.noreply.github.com'

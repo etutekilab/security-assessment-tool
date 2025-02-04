@@ -7,6 +7,9 @@
     
     <!-- Load environment first -->
     <script>
+        // Add base path for GitHub Pages
+        window.basePath = '/security-assessment-tool';
+        
         // Add global error handler for script loading
         window.handleScriptError = function(scriptSrc) {
             console.error(`Failed to load script: ${scriptSrc}`);
@@ -25,9 +28,6 @@
             banner.textContent = `⚠️ Failed to load required script: ${scriptSrc}. Please check console for details.`;
             document.body.appendChild(banner);
         };
-
-        // Add base path for GitHub Pages
-        window.basePath = '/security-assessment-tool';
     </script>
     
     <script src="/security-assessment-tool/env.js" onerror="handleScriptError('env.js')"></script>
